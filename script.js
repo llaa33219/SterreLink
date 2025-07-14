@@ -725,8 +725,10 @@ class SterreLink {
     }
 }
 
-// 전역 인스턴스 생성
-const sterreLink = new SterreLink();
+// DOM이 로드된 후 전역 인스턴스 생성
+document.addEventListener('DOMContentLoaded', () => {
+    const sterreLink = new SterreLink();
+});
 
 // 페이지 로드 완료 후 키보드 단축키 설정
 document.addEventListener('DOMContentLoaded', () => {
