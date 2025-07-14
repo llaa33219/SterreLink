@@ -5,36 +5,72 @@ const GOOGLE_USER_INFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 
 // JWT 관련 함수들
 async function createJWT(payload, secret) {
-    const header = {
-        alg: 'HS256',
-        typ: 'JWT'
-    };
+    console.log('Creating JWT for payload:', payload.email);
     
-    const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '');
-    const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '');
-    
-    const data = `${encodedHeader}.${encodedPayload}`;
-    const key = await crypto.subtle.importKey(
-        'raw',
-        new TextEncoder().encode(secret),
-        { name: 'HMAC', hash: 'SHA-256' },
-        false,
-        ['sign']
-    );
-    
-    const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
-    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, '');
-    
-    return `${data}.${encodedSignature}`;
+    try {
+        const header = {
+            alg: 'HS256',
+            typ: 'JWT'
+        };
+        
+        // Base64URL 인코딩 (Cloudflare Workers 환경 최적화)
+        const base64UrlEncode = (str) => {
+            return btoa(str)
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=/g, '');
+        };
+        
+        const encodedHeader = base64UrlEncode(JSON.stringify(header));
+        const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+        
+        const data = `${encodedHeader}.${encodedPayload}`;
+        console.log('JWT data created:', data.substring(0, 50) + '...');
+        
+        const key = await crypto.subtle.importKey(
+            'raw',
+            new TextEncoder().encode(secret),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        
+        const signature = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(data));
+        const encodedSignature = base64UrlEncode(String.fromCharCode(...new Uint8Array(signature)));
+        
+        const jwt = `${data}.${encodedSignature}`;
+        console.log('JWT created successfully');
+        
+        return jwt;
+    } catch (error) {
+        console.error('JWT creation error:', error);
+        throw error;
+    }
 }
 
 async function verifyJWT(token, secret) {
+    console.log('Verifying JWT token');
+    
     try {
         const parts = token.split('.');
-        if (parts.length !== 3) return null;
+        if (parts.length !== 3) {
+            console.log('Invalid JWT format');
+            return null;
+        }
         
         const [headerB64, payloadB64, signatureB64] = parts;
         const data = `${headerB64}.${payloadB64}`;
+        
+        // Base64URL 디코딩 (Cloudflare Workers 환경 최적화)
+        const base64UrlDecode = (str) => {
+            // Base64URL을 Base64로 변환
+            str = str.replace(/-/g, '+').replace(/_/g, '/');
+            // 패딩 추가
+            while (str.length % 4) {
+                str += '=';
+            }
+            return atob(str);
+        };
         
         const key = await crypto.subtle.importKey(
             'raw',
@@ -44,20 +80,26 @@ async function verifyJWT(token, secret) {
             ['verify']
         );
         
-        const signature = Uint8Array.from(atob(signatureB64), c => c.charCodeAt(0));
+        const signature = Uint8Array.from(base64UrlDecode(signatureB64), c => c.charCodeAt(0));
         const isValid = await crypto.subtle.verify('HMAC', key, signature, new TextEncoder().encode(data));
         
-        if (!isValid) return null;
-        
-        const payload = JSON.parse(atob(payloadB64));
-        
-        // 토큰 만료 확인
-        if (payload.exp && payload.exp < Date.now() / 1000) {
+        if (!isValid) {
+            console.log('JWT signature verification failed');
             return null;
         }
         
+        const payload = JSON.parse(base64UrlDecode(payloadB64));
+        
+        // 토큰 만료 확인
+        if (payload.exp && payload.exp < Date.now() / 1000) {
+            console.log('JWT token expired');
+            return null;
+        }
+        
+        console.log('JWT verified successfully for user:', payload.email);
         return payload;
     } catch (error) {
+        console.error('JWT verification error:', error);
         return null;
     }
 }
@@ -79,18 +121,47 @@ function setCORSHeaders(response) {
     return response;
 }
 
-// 사용자 정보 가져오기 (JWT에서)
+// 사용자 정보 가져오기 (세션에서)
 async function getUser(request, env) {
+    console.log('Getting user from session...');
+    
     const cookies = request.headers.get('Cookie');
-    if (!cookies) return null;
+    if (!cookies) {
+        console.log('No cookies found');
+        return null;
+    }
     
     const tokenMatch = cookies.match(/auth_token=([^;]+)/);
-    if (!tokenMatch) return null;
+    if (!tokenMatch) {
+        console.log('No auth token found in cookies');
+        return null;
+    }
     
-    const token = tokenMatch[1];
-    const secret = env.GOOGLE_CLIENT_SECRET || 'fallback-secret';
+    const sessionId = tokenMatch[1];
+    console.log('Session ID found:', sessionId);
     
-    return await verifyJWT(token, secret);
+    try {
+        const sessionData = await env.KV_NAMESPACE.get(`session:${sessionId}`, { type: 'json' });
+        
+        if (!sessionData) {
+            console.log('No session data found');
+            return null;
+        }
+        
+        // 세션 만료 확인
+        if (sessionData.expiresAt < Date.now()) {
+            console.log('Session expired');
+            // 만료된 세션 삭제
+            await env.KV_NAMESPACE.delete(`session:${sessionId}`);
+            return null;
+        }
+        
+        console.log('User session found:', sessionData.email);
+        return sessionData;
+    } catch (error) {
+        console.error('Error getting user session:', error);
+        return null;
+    }
 }
 
 // 구글 OAuth 시작
@@ -197,22 +268,40 @@ async function handleGoogleCallback(request, env) {
         const userData = await userResponse.json();
         console.log('User info received:', userData.email);
         
-        // JWT 생성
-        const payload = {
+        // 세션 토큰 생성 (JWT 대신 간단한 방법)
+        const sessionId = generateUUID();
+        const sessionData = {
             email: userData.email,
             name: userData.name,
             picture: userData.picture,
-            exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60) // 30일
+            createdAt: Date.now(),
+            expiresAt: Date.now() + (30 * 24 * 60 * 60 * 1000) // 30일
         };
         
-        const secret = env.GOOGLE_CLIENT_SECRET || 'fallback-secret';
-        const jwt = await createJWT(payload, secret);
+        console.log('Saving session to KV...');
         
-        console.log('JWT created, setting cookie and redirecting...');
+        // KV에 세션 저장
+        await env.KV_NAMESPACE.put(`session:${sessionId}`, JSON.stringify(sessionData), {
+            expirationTtl: 30 * 24 * 60 * 60 // 30일
+        });
+        
+        console.log('Session saved, setting cookie and redirecting...');
         
         // 리다이렉트 응답에 쿠키 설정
         const response = Response.redirect(`${url.origin}/?auth=success`, 302);
-        response.headers.set('Set-Cookie', `auth_token=${jwt}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
+        
+        // 쿠키 설정 (세션 ID만 저장)
+        const cookieOptions = [
+            `auth_token=${sessionId}`,
+            'Path=/',
+            'HttpOnly',
+            'Secure',
+            'SameSite=Lax',
+            `Max-Age=${30 * 24 * 60 * 60}`
+        ];
+        
+        response.headers.set('Set-Cookie', cookieOptions.join('; '));
+        console.log('Cookie set successfully');
         
         return response;
     } catch (error) {
@@ -259,13 +348,38 @@ async function handleAuthStatus(request, env) {
 
 // 로그아웃
 async function handleLogout(request, env) {
-    const response = new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' }
-    });
+    console.log('Handling logout...');
     
-    response.headers.set('Set-Cookie', 'auth_token=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0');
-    
-    return response;
+    try {
+        // 현재 세션 ID 가져오기
+        const cookies = request.headers.get('Cookie');
+        if (cookies) {
+            const tokenMatch = cookies.match(/auth_token=([^;]+)/);
+            if (tokenMatch) {
+                const sessionId = tokenMatch[1];
+                console.log('Deleting session:', sessionId);
+                
+                // KV에서 세션 삭제
+                await env.KV_NAMESPACE.delete(`session:${sessionId}`);
+            }
+        }
+        
+        const response = new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        // 쿠키 삭제
+        response.headers.set('Set-Cookie', 'auth_token=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0');
+        
+        console.log('Logout successful');
+        return response;
+    } catch (error) {
+        console.error('Logout error:', error);
+        return new Response(JSON.stringify({ error: 'Logout failed' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 }
 
 // 디버그 - 환경 변수 상태 확인
