@@ -247,14 +247,18 @@ async function handleGoogleCallback(request, env) {
                 redirect_uri: `${url.origin}/api/auth/callback`
             })
         });
+
+        if (!tokenResponse.ok) {
+            const errorText = await tokenResponse.text();
+            console.error('Google token exchange failed:', tokenResponse.status, errorText);
+            return new Response(JSON.stringify({ error: 'Google token exchange failed', details: errorText }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
         
         const tokenData = await tokenResponse.json();
-        console.log('Token response status:', tokenResponse.status);
-        
-        if (!tokenData.access_token) {
-            console.error('No access token received:', tokenData);
-            return Response.redirect(`${url.origin}/?auth=error`, 302);
-        }
+        console.log('Token received:', tokenData.access_token ? 'valid' : 'invalid');
         
         console.log('Token received, fetching user info...');
         
