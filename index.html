@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SterreLink - 우주 바로가기</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="space-container">
+        <!-- 우주 배경 별들 -->
+        <div class="stars"></div>
+        <div class="stars2"></div>
+        <div class="stars3"></div>
+        
+        <!-- 중앙 항성 (구글 로고 또는 추가 버튼) -->
+        <div class="star-system">
+            <div class="central-star" id="centralStar">
+                <div class="star-glow"></div>
+                <div class="star-core" id="starCore">
+                    <img id="starIcon" src="" alt="Central Star">
+                </div>
+            </div>
+            
+            <!-- 궤도들 -->
+            <div class="orbit-container" id="orbitContainer">
+                <!-- 궤도와 행성들이 동적으로 추가됨 -->
+            </div>
+        </div>
+        
+        <!-- 사용자 인터페이스 -->
+        <div class="ui-overlay">
+            <div class="user-info" id="userInfo">
+                <div class="user-avatar" id="userAvatar"></div>
+                <div class="user-name" id="userName">로그인이 필요합니다</div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn" id="addSiteBtn" title="새 사이트 추가">+</button>
+                <button class="control-btn" id="logoutBtn" title="로그아웃">⚙️</button>
+            </div>
+        </div>
+        
+        <!-- 사이트 추가 모달 -->
+        <div class="modal" id="addSiteModal">
+            <div class="modal-content">
+                <span class="close" id="closeModal">&times;</span>
+                <h2>새 사이트 추가</h2>
+                
+                <!-- 탭 메뉴 -->
+                <div class="tab-container">
+                    <button class="tab-btn active" data-tab="manual">수동 추가</button>
+                    <button class="tab-btn" data-tab="import">북마크 가져오기</button>
+                </div>
+                
+                <!-- 수동 추가 탭 -->
+                <div class="tab-content active" id="manual-tab">
+                    <form id="addSiteForm">
+                        <div class="form-group">
+                            <label for="siteTitle">사이트 제목:</label>
+                            <input type="text" id="siteTitle" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="siteUrl">사이트 URL:</label>
+                            <input type="url" id="siteUrl" name="url" required>
+                        </div>
+                        <button type="submit">추가</button>
+                    </form>
+                </div>
+                
+                <!-- 북마크 가져오기 탭 -->
+                <div class="tab-content" id="import-tab">
+                    <div class="import-section">
+                        <div class="form-group">
+                            <label for="bookmarkFile">북마크 HTML 파일:</label>
+                            <input type="file" id="bookmarkFile" accept=".html,.htm" required>
+                            <small class="help-text">브라우저에서 북마크 → 북마크 및 설정 내보내기로 생성한 HTML 파일</small>
+                        </div>
+                        <button type="button" id="importBookmarks">북마크 가져오기</button>
+                    </div>
+                    
+                    <!-- 가져오기 진행 상태 -->
+                    <div class="import-progress" id="importProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">처리 중...</div>
+                    </div>
+                    
+                    <!-- 가져온 북마크 미리보기 -->
+                    <div class="bookmark-preview" id="bookmarkPreview" style="display: none;">
+                        <h3>가져올 북마크 미리보기</h3>
+                        <div class="preview-list" id="previewList"></div>
+                        <div class="preview-actions">
+                            <button type="button" id="confirmImport">선택한 북마크 추가</button>
+                            <button type="button" id="cancelImport">취소</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 사이트 상세 정보 툴팁 -->
+        <div class="site-tooltip" id="siteTooltip">
+            <div class="tooltip-content">
+                <div class="tooltip-title"></div>
+                <div class="tooltip-url"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
