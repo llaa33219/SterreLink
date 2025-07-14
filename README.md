@@ -21,8 +21,9 @@
 1. [Google Cloud Console](https://console.cloud.google.com/)에서 새 프로젝트 생성
 2. OAuth 2.0 클라이언트 ID 생성:
    - 애플리케이션 유형: 웹 애플리케이션
-   - 승인된 리디렉션 URI: `https://your-domain.com/api/auth/callback`
-3. 클라이언트 ID와 클라이언트 시크릿 메모
+   - 승인된 JavaScript 원본: `https://your-domain.com`
+   - 승인된 리디렉션 URI는 설정하지 않아도 됩니다 (클라이언트사이드 인증)
+3. 클라이언트 ID 메모 (클라이언트 시크릿은 필요 없음)
 
 ### 2. Cloudflare 설정
 
@@ -34,9 +35,8 @@ wrangler kv:namespace create "KV_NAMESPACE" --preview
 
 #### 환경 변수 설정
 ```bash
-# Google OAuth 정보 설정
-wrangler secret put GOOGLE_CLIENT_ID
-wrangler secret put GOOGLE_CLIENT_SECRET
+# Google Client ID 설정 (wrangler.toml의 [vars]에 추가)
+# GOOGLE_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com"
 
 # JWT 시크릿 설정 (임의의 강력한 문자열)
 wrangler secret put JWT_SECRET
@@ -56,6 +56,9 @@ account_id = "YOUR_ACCOUNT_ID"  # 실제 계정 ID로 교체
 binding = "KV_NAMESPACE"
 id = "YOUR_KV_NAMESPACE_ID"          # 위에서 생성한 KV ID로 교체
 preview_id = "YOUR_PREVIEW_KV_ID"    # 프리뷰용 KV ID로 교체
+
+[vars]
+GOOGLE_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com"
 ```
 
 ### 4. 배포
@@ -163,8 +166,9 @@ const orbitRadius = 150 + (index * 80); // 이 부분을 수정
 ## 🔐 보안 고려사항
 
 - JWT 시크릿은 강력한 랜덤 문자열로 설정
-- Google OAuth 리디렉션 URI는 정확히 설정
+- Google OAuth 승인된 JavaScript 원본은 정확히 설정
 - HTTPS를 통해서만 서비스 제공
+- Google Client ID는 공개되어도 안전하지만, 도메인 제한으로 보안 강화
 
 ## 📝 라이선스
 

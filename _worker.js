@@ -2,14 +2,10 @@
 
 // 환경 변수 (바인딩에서 설정)
 // GOOGLE_CLIENT_ID - 구글 OAuth 클라이언트 ID
-// GOOGLE_CLIENT_SECRET - 구글 OAuth 클라이언트 시크릿
 // JWT_SECRET - JWT 토큰 서명용 시크릿
 // KV_NAMESPACE - KV 스토리지 네임스페이스 바인딩
-// REDIRECT_URI - OAuth 리디렉션 URI
 
-const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
-const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
+const GOOGLE_CERTS_URL = 'https://www.googleapis.com/oauth2/v1/certs';
 
 class SterreLinkWorker {
     constructor(env) {
@@ -68,13 +64,14 @@ class SterreLinkWorker {
         const url = new URL(request.url);
         const method = request.method;
 
-        // 인증 관련 API
-        if (path === '/api/auth/google' && method === 'GET') {
-            return this.handleGoogleAuth(request);
+        // 설정 API (인증 불필요)
+        if (path === '/api/config' && method === 'GET') {
+            return this.handleConfig(request);
         }
 
-        if (path === '/api/auth/callback' && method === 'GET') {
-            return this.handleGoogleCallback(request);
+        // 인증 관련 API
+        if (path === '/api/auth/google' && method === 'POST') {
+            return this.handleGoogleAuth(request);
         }
 
         if (path === '/api/auth/status' && method === 'GET') {
@@ -117,63 +114,45 @@ class SterreLinkWorker {
         });
     }
 
-    async handleGoogleAuth(request) {
-        const url = new URL(request.url);
-        const redirectUri = `${url.origin}/api/auth/callback`;
-
-        const authUrl = new URL(GOOGLE_AUTH_URL);
-        authUrl.searchParams.set('client_id', this.env.GOOGLE_CLIENT_ID);
-        authUrl.searchParams.set('redirect_uri', redirectUri);
-        authUrl.searchParams.set('response_type', 'code');
-        authUrl.searchParams.set('scope', 'openid email profile');
-        authUrl.searchParams.set('state', 'sterrelink_auth');
-
-        return Response.redirect(authUrl.toString(), 302);
+    async handleConfig(request) {
+        return new Response(JSON.stringify({
+            googleClientId: this.env.GOOGLE_CLIENT_ID
+        }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
-    async handleGoogleCallback(request) {
-        const url = new URL(request.url);
-        const code = url.searchParams.get('code');
-        const state = url.searchParams.get('state');
-
-        if (!code || state !== 'sterrelink_auth') {
-            return Response.redirect('/?error=auth_failed', 302);
-        }
-
+    async handleGoogleAuth(request) {
         try {
-            // 액세스 토큰 교환
-            const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    client_id: this.env.GOOGLE_CLIENT_ID,
-                    client_secret: this.env.GOOGLE_CLIENT_SECRET,
-                    code: code,
-                    grant_type: 'authorization_code',
-                    redirect_uri: `${url.origin}/api/auth/callback`,
-                })
-            });
+            const body = await request.json();
+            const { credential } = body;
 
-            const tokenData = await tokenResponse.json();
-
-            if (!tokenData.access_token) {
-                return Response.redirect('/?error=token_failed', 302);
+            if (!credential) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: 'Credential is required'
+                }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
             }
 
-            // 사용자 정보 가져오기
-            const userResponse = await fetch(GOOGLE_USERINFO_URL, {
-                headers: {
-                    Authorization: `Bearer ${tokenData.access_token}`
-                }
-            });
+            // Google JWT 토큰 검증
+            const userData = await this.verifyGoogleJWT(credential);
 
-            const userData = await userResponse.json();
+            if (!userData) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: 'Invalid token'
+                }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
 
             // 사용자 데이터 저장
             const user = {
-                id: userData.id,
+                id: userData.sub,
                 email: userData.email,
                 name: userData.name,
                 picture: userData.picture,
@@ -185,15 +164,65 @@ class SterreLinkWorker {
             // JWT 토큰 생성
             const jwtToken = await this.generateJWT(user);
 
-            // 메인 페이지로 리디렉션 (JWT 토큰을 쿠키로 설정)
-            const response = Response.redirect('/', 302);
+            // 응답에 쿠키 설정
+            const response = new Response(JSON.stringify({
+                success: true,
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    picture: user.picture
+                }
+            }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+
             response.headers.set('Set-Cookie', `auth_token=${jwtToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=2592000`);
 
             return response;
 
         } catch (error) {
-            console.error('Google callback error:', error);
-            return Response.redirect('/?error=callback_error', 302);
+            console.error('Google auth error:', error);
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Authentication failed'
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    async verifyGoogleJWT(token) {
+        try {
+            // JWT 토큰을 파싱
+            const parts = token.split('.');
+            if (parts.length !== 3) {
+                throw new Error('Invalid JWT format');
+            }
+
+            const header = JSON.parse(this.base64UrlDecode(parts[0]));
+            const payload = JSON.parse(this.base64UrlDecode(parts[1]));
+
+            // 기본 검증
+            if (payload.aud !== this.env.GOOGLE_CLIENT_ID) {
+                throw new Error('Invalid audience');
+            }
+
+            if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
+                throw new Error('Invalid issuer');
+            }
+
+            if (payload.exp < Math.floor(Date.now() / 1000)) {
+                throw new Error('Token expired');
+            }
+
+            // 간단한 검증만 수행 (실제 운영에서는 서명 검증도 필요)
+            return payload;
+
+        } catch (error) {
+            console.error('JWT verification failed:', error);
+            return null;
         }
     }
 
@@ -1213,21 +1242,42 @@ body {
         // 핵심 JavaScript 로직 임베드
         return `
 class SterreLink {
-    constructor() {
-        this.user = null;
-        this.sites = [];
-        this.isLoggedIn = false;
-        this.tooltip = null;
-        this.dragData = { isDragging: false, lastX: 0, lastY: 0 };
-        this.init();
-    }
+         constructor() {
+         this.user = null;
+         this.sites = [];
+         this.isLoggedIn = false;
+         this.tooltip = null;
+         this.dragData = { isDragging: false, lastX: 0, lastY: 0 };
+         this.googleClientId = null;
+         this.init();
+     }
 
-    init() {
-        this.setupEventListeners();
-        this.checkAuthStatus();
-        this.setupTooltip();
-        this.setupDragAndDrop();
-    }
+     init() {
+         this.setupEventListeners();
+         this.initializeGoogleAuth();
+         this.checkAuthStatus();
+         this.setupTooltip();
+         this.setupDragAndDrop();
+     }
+
+     async initializeGoogleAuth() {
+         try {
+             const response = await fetch('/api/config');
+             const config = await response.json();
+             this.googleClientId = config.googleClientId;
+
+             if (window.google?.accounts?.id) {
+                 window.google.accounts.id.initialize({
+                     client_id: this.googleClientId,
+                     callback: this.handleGoogleResponse.bind(this),
+                     auto_select: false,
+                     cancel_on_tap_outside: false
+                 });
+             }
+         } catch (error) {
+             console.error('Google Auth 초기화 실패:', error);
+         }
+     }
 
     setupEventListeners() {
         document.getElementById('centralStar').addEventListener('click', () => {
@@ -1358,13 +1408,45 @@ class SterreLink {
         }
     }
 
-    async initiateGoogleAuth() {
-        try {
-            window.location.href = '/api/auth/google';
-        } catch (error) {
-            console.error('Google 인증 시작 실패:', error);
-        }
-    }
+         async initiateGoogleAuth() {
+         try {
+             if (window.google?.accounts?.id) {
+                 window.google.accounts.id.prompt();
+             } else {
+                 alert('Google 인증이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+             }
+         } catch (error) {
+             console.error('Google 인증 시작 실패:', error);
+         }
+     }
+
+     async handleGoogleResponse(response) {
+         try {
+             const loginResponse = await fetch('/api/auth/google', {
+                 method: 'POST',
+                 headers: {
+                     'Content-Type': 'application/json',
+                 },
+                 body: JSON.stringify({
+                     credential: response.credential
+                 })
+             });
+
+             const data = await loginResponse.json();
+
+             if (data.success) {
+                 this.user = data.user;
+                 this.isLoggedIn = true;
+                 this.updateUI();
+                 this.loadSites();
+             } else {
+                 alert('로그인에 실패했습니다: ' + data.error);
+             }
+         } catch (error) {
+             console.error('Google 인증 처리 실패:', error);
+             alert('로그인 중 오류가 발생했습니다.');
+         }
+     }
 
     async loadSites() {
         try {

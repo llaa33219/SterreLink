@@ -5,15 +5,36 @@ class SterreLink {
         this.isLoggedIn = false;
         this.tooltip = null;
         this.dragData = { isDragging: false, lastX: 0, lastY: 0 };
+        this.googleClientId = null;
         
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.initializeGoogleAuth();
         this.checkAuthStatus();
         this.setupTooltip();
         this.setupDragAndDrop();
+    }
+
+    async initializeGoogleAuth() {
+        try {
+            // 서버에서 Google Client ID 가져오기
+            const response = await fetch('/api/config');
+            const config = await response.json();
+            this.googleClientId = config.googleClientId;
+
+            // Google Identity Services 초기화
+            window.google?.accounts.id.initialize({
+                client_id: this.googleClientId,
+                callback: this.handleGoogleResponse.bind(this),
+                auto_select: false,
+                cancel_on_tap_outside: false
+            });
+        } catch (error) {
+            console.error('Google Auth 초기화 실패:', error);
+        }
     }
 
     setupEventListeners() {
@@ -148,9 +169,42 @@ class SterreLink {
 
     async initiateGoogleAuth() {
         try {
-            window.location.href = '/api/auth/google';
+            if (window.google?.accounts.id) {
+                window.google.accounts.id.prompt();
+            } else {
+                alert('Google 인증이 아직 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+            }
         } catch (error) {
             console.error('Google 인증 시작 실패:', error);
+        }
+    }
+
+    async handleGoogleResponse(response) {
+        try {
+            // Google에서 받은 JWT 토큰을 서버로 전송
+            const loginResponse = await fetch('/api/auth/google', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    credential: response.credential
+                })
+            });
+
+            const data = await loginResponse.json();
+
+            if (data.success) {
+                this.user = data.user;
+                this.isLoggedIn = true;
+                this.updateUI();
+                this.loadSites();
+            } else {
+                alert('로그인에 실패했습니다: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Google 인증 처리 실패:', error);
+            alert('로그인 중 오류가 발생했습니다.');
         }
     }
 
