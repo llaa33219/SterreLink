@@ -169,15 +169,15 @@ async function handleGoogleAuth(request, env) {
     console.log('handleGoogleAuth called');
     
     // 환경 변수 확인
-    if (!env.GOOGLE_CLIENT_ID) {
-        console.error('GOOGLE_CLIENT_ID not found in environment variables');
-        return new Response(JSON.stringify({ error: 'Google Client ID not configured' }), {
+    if (!env.GOOGLE_CLIENT_ID || !env.REDIRECT_URI) {
+        console.error('GOOGLE_CLIENT_ID or REDIRECT_URI not found in environment variables');
+        return new Response(JSON.stringify({ error: 'Google Client ID or Redirect URI not configured' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
     }
     
-    const redirectUri = `${new URL(request.url).origin}/api/auth/callback`;
+    const redirectUri = env.REDIRECT_URI;
     const state = generateUUID();
     
     console.log('Redirect URI:', redirectUri);
@@ -225,8 +225,8 @@ async function handleGoogleCallback(request, env) {
         return Response.redirect(`${url.origin}/?auth=error`, 302);
     }
     
-    if (!env.GOOGLE_CLIENT_SECRET) {
-        console.error('GOOGLE_CLIENT_SECRET not found in environment');
+    if (!env.GOOGLE_CLIENT_SECRET || !env.REDIRECT_URI) {
+        console.error('GOOGLE_CLIENT_SECRET or REDIRECT_URI not found in environment');
         return Response.redirect(`${url.origin}/?auth=error`, 302);
     }
     
@@ -244,7 +244,7 @@ async function handleGoogleCallback(request, env) {
                 client_secret: env.GOOGLE_CLIENT_SECRET,
                 code: code,
                 grant_type: 'authorization_code',
-                redirect_uri: `${url.origin}/api/auth/callback`
+                redirect_uri: env.REDIRECT_URI
             })
         });
 
