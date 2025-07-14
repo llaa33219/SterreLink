@@ -378,11 +378,9 @@ export default {
                 return handleDebugEnv(request, env);
             }
             
-            // 정적 에셋 제공 (Cloudflare Pages가 자동으로 처리)
-            // 요청이 API 라우트에 해당하지 않으면 Pages가 정적 파일을 서빙합니다.
-            // 따라서 별도의 정적 파일 처리 로직은 필요 없습니다.
-
-            return new Response('Not Found', { status: 404 });
+            // API 경로가 아닌 다른 모든 요청은 정적 에셋 핸들러로 전달합니다.
+            // 이를 통해 index.html, script.js 등의 파일이 제공됩니다.
+            return env.ASSETS.fetch(request);
 
         } catch (e) {
             console.error('Unhandled error in fetch handler:', e);
