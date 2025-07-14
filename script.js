@@ -39,59 +39,89 @@ class SterreLink {
 
     setupEventListeners() {
         // 중앙 항성 클릭 이벤트
-        document.getElementById('centralStar').addEventListener('click', () => {
-            if (!this.isLoggedIn) {
-                this.initiateGoogleAuth();
-            } else {
-                this.showAddSiteModal();
-            }
-        });
+        const centralStar = document.getElementById('centralStar');
+        if (centralStar) {
+            centralStar.addEventListener('click', () => {
+                if (!this.isLoggedIn) {
+                    this.initiateGoogleAuth();
+                } else {
+                    this.showAddSiteModal();
+                }
+            });
+        }
 
         // 모달 관련 이벤트
-        document.getElementById('addSiteBtn').addEventListener('click', () => {
-            this.showAddSiteModal();
-        });
+        const addSiteBtn = document.getElementById('addSiteBtn');
+        if (addSiteBtn) {
+            addSiteBtn.addEventListener('click', () => {
+                this.showAddSiteModal();
+            });
+        }
 
-        document.getElementById('closeModal').addEventListener('click', () => {
-            this.hideAddSiteModal();
-        });
+        const closeModal = document.getElementById('closeModal');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => {
+                this.hideAddSiteModal();
+            });
+        }
 
-        document.getElementById('addSiteForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.addSite();
-        });
+        const addSiteForm = document.getElementById('addSiteForm');
+        if (addSiteForm) {
+            addSiteForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.addSite();
+            });
+        }
 
         // 로그아웃 버튼
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            this.logout();
-        });
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                this.logout();
+            });
+        }
 
         // 모달 외부 클릭 시 닫기
-        document.getElementById('addSiteModal').addEventListener('click', (e) => {
-            if (e.target.id === 'addSiteModal') {
-                this.hideAddSiteModal();
-            }
-        });
+        const addSiteModal = document.getElementById('addSiteModal');
+        if (addSiteModal) {
+            addSiteModal.addEventListener('click', (e) => {
+                if (e.target.id === 'addSiteModal') {
+                    this.hideAddSiteModal();
+                }
+            });
+        }
 
         // 탭 전환 이벤트
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.switchTab(e.target.dataset.tab);
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        if (tabBtns) {
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    this.switchTab(e.target.dataset.tab);
+                });
             });
-        });
+        }
 
         // 북마크 가져오기 이벤트
-        document.getElementById('importBookmarks').addEventListener('click', () => {
-            this.handleBookmarkImport();
-        });
+        const importBookmarksBtn = document.getElementById('importBookmarks');
+        if (importBookmarksBtn) {
+            importBookmarksBtn.addEventListener('click', () => {
+                this.handleBookmarkImport();
+            });
+        }
 
-        document.getElementById('confirmImport').addEventListener('click', () => {
-            this.confirmBookmarkImport();
-        });
+        const confirmImportBtn = document.getElementById('confirmImport');
+        if (confirmImportBtn) {
+            confirmImportBtn.addEventListener('click', () => {
+                this.confirmBookmarkImport();
+            });
+        }
 
-        document.getElementById('cancelImport').addEventListener('click', () => {
-            this.cancelBookmarkImport();
-        });
+        const cancelImportBtn = document.getElementById('cancelImport');
+        if (cancelImportBtn) {
+            cancelImportBtn.addEventListener('click', () => {
+                this.cancelBookmarkImport();
+            });
+        }
     }
 
     setupTooltip() {
@@ -728,11 +758,7 @@ class SterreLink {
 // DOM이 로드된 후 전역 인스턴스 생성
 document.addEventListener('DOMContentLoaded', () => {
     const sterreLink = new SterreLink();
-});
-
-// 페이지 로드 완료 후 키보드 단축키 설정
-document.addEventListener('DOMContentLoaded', () => {
-    sterreLink.setupKeyboardShortcuts();
+    // 키보드 단축키는 생성자에서 이미 설정되므로 별도 호출 불필요
 });
 
 // 컨텍스트 메뉴 스타일 추가
