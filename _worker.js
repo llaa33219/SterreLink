@@ -95,8 +95,22 @@ async function getUser(request, env) {
 
 // 구글 OAuth 시작
 async function handleGoogleAuth(request, env) {
+    console.log('handleGoogleAuth called');
+    
+    // 환경 변수 확인
+    if (!env.GOOGLE_CLIENT_ID) {
+        console.error('GOOGLE_CLIENT_ID not found in environment variables');
+        return new Response(JSON.stringify({ error: 'Google Client ID not configured' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+    
     const redirectUri = `${new URL(request.url).origin}/api/auth/callback`;
     const state = generateUUID();
+    
+    console.log('Redirect URI:', redirectUri);
+    console.log('Client ID:', env.GOOGLE_CLIENT_ID);
     
     const params = new URLSearchParams({
         client_id: env.GOOGLE_CLIENT_ID,
@@ -182,22 +196,37 @@ async function handleGoogleCallback(request, env) {
 
 // 로그인 상태 확인
 async function handleAuthStatus(request, env) {
-    const user = await getUser(request, env);
+    console.log('handleAuthStatus called');
     
-    if (user) {
-        return new Response(JSON.stringify({
-            isLoggedIn: true,
-            email: user.email,
-            name: user.name,
-            picture: user.picture
+    try {
+        const user = await getUser(request, env);
+        
+        if (user) {
+            console.log('User found:', user.email);
+            return new Response(JSON.stringify({
+                isLoggedIn: true,
+                email: user.email,
+                name: user.name,
+                picture: user.picture
+            }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        
+        console.log('No user found');
+        return new Response(JSON.stringify({ isLoggedIn: false }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error in handleAuthStatus:', error);
+        return new Response(JSON.stringify({ 
+            error: 'Internal server error',
+            isLoggedIn: false 
         }), {
+            status: 500,
             headers: { 'Content-Type': 'application/json' }
         });
     }
-    
-    return new Response(JSON.stringify({ isLoggedIn: false }), {
-        headers: { 'Content-Type': 'application/json' }
-    });
 }
 
 // 로그아웃
@@ -213,17 +242,31 @@ async function handleLogout(request, env) {
 
 // 북마크 조회
 async function handleGetBookmarks(request, env) {
+    console.log('handleGetBookmarks called');
+    
     const user = await getUser(request, env);
     if (!user) {
+        console.log('Unauthorized: no user found');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' }
         });
     }
     
+    // KV 네임스페이스 확인
+    if (!env.KV_NAMESPACE) {
+        console.error('KV_NAMESPACE not found in environment');
+        return new Response(JSON.stringify({ error: 'KV namespace not configured' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+    
     try {
+        console.log('Fetching bookmarks for user:', user.email);
         const bookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' });
         
+        console.log('Bookmarks found:', bookmarks ? bookmarks.length : 0);
         return new Response(JSON.stringify({ bookmarks: bookmarks || [] }), {
             headers: { 'Content-Type': 'application/json' }
         });
@@ -332,10 +375,14 @@ async function handleDeleteBookmark(request, env) {
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
-        const { pathname, method } = new URL(request.url);
+        const pathname = url.pathname;
+        const method = request.method;
+        
+        console.log(`${method} ${pathname}`);
         
         // OPTIONS 요청 처리 (CORS)
         if (method === 'OPTIONS') {
+            console.log('Handling OPTIONS request');
             return setCORSHeaders(new Response(null, { status: 200 }));
         }
         
@@ -345,27 +392,56 @@ export default {
             
             // 인증 관련 API
             if (pathname === '/api/auth/google' && method === 'GET') {
+                console.log('Routing to handleGoogleAuth');
                 response = await handleGoogleAuth(request, env);
             } else if (pathname === '/api/auth/callback' && method === 'GET') {
+                console.log('Routing to handleGoogleCallback');
                 response = await handleGoogleCallback(request, env);
             } else if (pathname === '/api/auth/status' && method === 'GET') {
+                console.log('Routing to handleAuthStatus');
                 response = await handleAuthStatus(request, env);
             } else if (pathname === '/api/auth/logout' && method === 'POST') {
+                console.log('Routing to handleLogout');
                 response = await handleLogout(request, env);
             }
             
             // 북마크 관련 API
             else if (pathname === '/api/bookmarks' && method === 'GET') {
+                console.log('Routing to handleGetBookmarks');
                 response = await handleGetBookmarks(request, env);
             } else if (pathname === '/api/bookmarks' && method === 'POST') {
+                console.log('Routing to handleAddBookmark');
                 response = await handleAddBookmark(request, env);
             } else if (pathname.startsWith('/api/bookmarks/') && method === 'DELETE') {
+                console.log('Routing to handleDeleteBookmark');
                 response = await handleDeleteBookmark(request, env);
+            }
+            
+            // API 경로인데 매칭되지 않은 경우 404 반환
+            else if (pathname.startsWith('/api/')) {
+                console.log('API endpoint not found:', pathname);
+                response = new Response(JSON.stringify({ error: 'API endpoint not found' }), {
+                    status: 404,
+                    headers: { 'Content-Type': 'application/json' }
+                });
             }
             
             // 정적 파일 제공 (기본 동작)
             else {
-                return env.ASSETS.fetch(request);
+                console.log('Serving static file:', pathname);
+                
+                // ASSETS 바인딩 확인
+                if (!env.ASSETS) {
+                    console.error('ASSETS binding not found');
+                    return new Response('ASSETS binding not configured', { status: 500 });
+                }
+                
+                try {
+                    return env.ASSETS.fetch(request);
+                } catch (error) {
+                    console.error('Error serving static file:', error);
+                    return new Response('Error serving static file', { status: 500 });
+                }
             }
             
             return setCORSHeaders(response);
