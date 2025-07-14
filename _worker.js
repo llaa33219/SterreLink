@@ -232,6 +232,16 @@ async function handleGoogleCallback(request, env) {
     
     try {
         console.log('Exchanging code for token...');
+
+        const tokenRequestBody = {
+            client_id: env.GOOGLE_CLIENT_ID,
+            client_secret: env.GOOGLE_CLIENT_SECRET,
+            code: code,
+            grant_type: 'authorization_code',
+            redirect_uri: env.REDIRECT_URI
+        };
+
+        console.log('Google token request body:', JSON.stringify(tokenRequestBody));
         
         // 액세스 토큰 교환
         const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
@@ -239,13 +249,7 @@ async function handleGoogleCallback(request, env) {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: new URLSearchParams({
-                client_id: env.GOOGLE_CLIENT_ID,
-                client_secret: env.GOOGLE_CLIENT_SECRET,
-                code: code,
-                grant_type: 'authorization_code',
-                redirect_uri: env.REDIRECT_URI
-            })
+            body: new URLSearchParams(tokenRequestBody)
         });
 
         if (!tokenResponse.ok) {
