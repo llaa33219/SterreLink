@@ -268,6 +268,33 @@ async function handleLogout(request, env) {
     return response;
 }
 
+// 디버그 - 환경 변수 상태 확인
+async function handleDebugEnv(request, env) {
+    console.log('handleDebugEnv called');
+    
+    const debugInfo = {
+        timestamp: new Date().toISOString(),
+        environment: {
+            GOOGLE_CLIENT_ID: env.GOOGLE_CLIENT_ID ? `Set (${env.GOOGLE_CLIENT_ID.substring(0, 10)}...)` : 'Not set',
+            GOOGLE_CLIENT_SECRET: env.GOOGLE_CLIENT_SECRET ? 'Set' : 'Not set',
+            KV_NAMESPACE: env.KV_NAMESPACE ? 'Bound' : 'Not bound',
+            ASSETS: env.ASSETS ? 'Bound' : 'Not bound'
+        },
+        url: request.url,
+        method: request.method,
+        headers: {
+            'user-agent': request.headers.get('user-agent'),
+            'accept': request.headers.get('accept')
+        }
+    };
+    
+    console.log('Debug info:', debugInfo);
+    
+    return new Response(JSON.stringify(debugInfo, null, 2), {
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
 // 북마크 조회
 async function handleGetBookmarks(request, env) {
     console.log('handleGetBookmarks called');
@@ -431,6 +458,9 @@ export default {
             } else if (pathname === '/api/auth/logout' && method === 'POST') {
                 console.log('Routing to handleLogout');
                 response = await handleLogout(request, env);
+            } else if (pathname === '/api/debug/env' && method === 'GET') {
+                console.log('Routing to debug environment');
+                response = await handleDebugEnv(request, env);
             }
             
             // 북마크 관련 API
