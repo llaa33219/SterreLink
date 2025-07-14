@@ -334,6 +334,77 @@ async function handleLogout(request, env) {
     return new Response(null, { status: 302, headers });
 }
 
+/**
+ * Fetches bookmarks for the authenticated user from KV.
+ */
+async function handleGetBookmarks(request, env, user) {
+    console.log(`Fetching bookmarks for user: ${user.email}`);
+    try {
+        if (!env.KV_NAMESPACE) {
+            console.error('KV_NAMESPACE is not bound.');
+            return new Response(JSON.stringify({ error: 'Server configuration error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
+        const bookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' });
+        return new Response(JSON.stringify({ bookmarks: bookmarks || [] }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error fetching bookmarks:', error);
+        return new Response(JSON.stringify({ error: 'Failed to fetch bookmarks' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+}
+
+/**
+ * Adds a new bookmark for the authenticated user.
+ */
+async function handleAddBookmark(request, env, user) {
+    console.log(`Adding bookmark for user: ${user.email}`);
+    try {
+        const { title, url } = await request.json();
+        if (!title || !url) {
+            return new Response(JSON.stringify({ error: 'Title and URL are required' }), { status: 400, headers: { 'Content-Type': 'application/json' }});
+        }
+
+        const existingBookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' }) || [];
+        const newBookmark = {
+            id: generateUUID(),
+            title,
+            url,
+            createdAt: new Date().toISOString()
+        };
+        const updatedBookmarks = [...existingBookmarks, newBookmark];
+
+        await env.KV_NAMESPACE.put(`bookmarks:${user.email}`, JSON.stringify(updatedBookmarks));
+
+        return new Response(JSON.stringify({ bookmark: newBookmark }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+        console.error('Error adding bookmark:', error);
+        return new Response(JSON.stringify({ error: 'Failed to add bookmark' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+}
+
+/**
+ * Deletes a bookmark for the authenticated user.
+ */
+async function handleDeleteBookmark(request, env, user, bookmarkId) {
+    console.log(`Deleting bookmark ${bookmarkId} for user: ${user.email}`);
+    try {
+        const existingBookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' }) || [];
+        const updatedBookmarks = existingBookmarks.filter(b => b.id !== bookmarkId);
+
+        if (existingBookmarks.length === updatedBookmarks.length) {
+            return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        await env.KV_NAMESPACE.put(`bookmarks:${user.email}`, JSON.stringify(updatedBookmarks));
+
+        return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
+    } catch (error) {
+        console.error(`Error deleting bookmark ${bookmarkId}:`, error);
+        return new Response(JSON.stringify({ error: 'Failed to delete bookmark' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
+}
+
 // --- END: NEW OAUTH2 LOGIC ---
 
 // 사용자 정보 가져오기 (세션에서)
