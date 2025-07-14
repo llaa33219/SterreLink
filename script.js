@@ -95,9 +95,11 @@ class SterreLink {
         const tabBtns = document.querySelectorAll('.tab-btn');
         if (tabBtns) {
             tabBtns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    this.switchTab(e.target.dataset.tab);
-                });
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        this.switchTab(e.target.dataset.tab);
+                    });
+                }
             });
         }
 
@@ -513,17 +515,28 @@ class SterreLink {
     switchTab(tabName) {
         // 모든 탭 버튼 비활성화
         document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.classList.remove('active');
+            if (btn) {
+                btn.classList.remove('active');
+            }
         });
         
         // 모든 탭 내용 숨기기
         document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
+            if (content) {
+                content.classList.remove('active');
+            }
         });
         
         // 선택된 탭 활성화
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById(`${tabName}-tab`).classList.add('active');
+        const activeTabBtn = document.querySelector(`[data-tab="${tabName}"]`);
+        if (activeTabBtn) {
+            activeTabBtn.classList.add('active');
+        }
+        
+        const activeTabContent = document.getElementById(`${tabName}-tab`);
+        if (activeTabContent) {
+            activeTabContent.classList.add('active');
+        }
         
         // 가져오기 관련 상태 리셋
         if (tabName === 'import') {
