@@ -279,6 +279,61 @@ async function handleGoogleCallback(request, env) {
     }
 }
 
+/**
+ * Checks the user's authentication status based on the session cookie.
+ */
+async function handleAuthStatus(request, env) {
+    console.log('Checking auth status...');
+    try {
+        const user = await getUser(request, env);
+        if (user) {
+            console.log('User is logged in:', user.email);
+            return new Response(JSON.stringify({
+                isLoggedIn: true,
+                email: user.email,
+                name: user.name,
+                picture: user.picture
+            }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } else {
+            console.log('User is not logged in.');
+            return new Response(JSON.stringify({ isLoggedIn: false }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    } catch (error) {
+        console.error('Error in handleAuthStatus:', error);
+        return new Response(JSON.stringify({ isLoggedIn: false, error: 'Failed to check status' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+}
+
+/**
+ * Handles user logout by deleting the session from KV and clearing the cookie.
+ */
+async function handleLogout(request, env) {
+    console.log('Handling logout...');
+    const url = new URL(request.url);
+    const cookieHeader = request.headers.get('Cookie');
+    const tokenMatch = cookieHeader?.match(/auth_token=([^;]+)/);
+
+    if (tokenMatch) {
+        const sessionId = tokenMatch[1];
+        console.log('Deleting session:', sessionId);
+        await env.KV_NAMESPACE.delete(`session:${sessionId}`);
+        console.log('Session deleted.');
+    }
+
+    const headers = new Headers({
+        'Location': `${url.origin}/`,
+        'Set-Cookie': `auth_token=; Path=/; HttpOnly; Secure; Max-Age=0; SameSite=Lax`
+    });
+    return new Response(null, { status: 302, headers });
+}
+
 // --- END: NEW OAUTH2 LOGIC ---
 
 // 사용자 정보 가져오기 (세션에서)
