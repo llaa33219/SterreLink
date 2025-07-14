@@ -129,19 +129,39 @@ async function handleGoogleAuth(request, env) {
 
 // 구글 OAuth 콜백 처리
 async function handleGoogleCallback(request, env) {
+    console.log('handleGoogleCallback called');
+    
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
     const error = url.searchParams.get('error');
     
+    console.log('OAuth callback - code:', code ? 'present' : 'missing');
+    console.log('OAuth callback - error:', error);
+    
     if (error) {
+        console.log('OAuth error, redirecting to error page');
         return Response.redirect(`${url.origin}/?auth=error`, 302);
     }
     
     if (!code) {
+        console.log('No code received, redirecting to error page');
+        return Response.redirect(`${url.origin}/?auth=error`, 302);
+    }
+    
+    // 환경 변수 확인
+    if (!env.GOOGLE_CLIENT_ID) {
+        console.error('GOOGLE_CLIENT_ID not found in environment');
+        return Response.redirect(`${url.origin}/?auth=error`, 302);
+    }
+    
+    if (!env.GOOGLE_CLIENT_SECRET) {
+        console.error('GOOGLE_CLIENT_SECRET not found in environment');
         return Response.redirect(`${url.origin}/?auth=error`, 302);
     }
     
     try {
+        console.log('Exchanging code for token...');
+        
         // 액세스 토큰 교환
         const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
             method: 'POST',
@@ -158,10 +178,14 @@ async function handleGoogleCallback(request, env) {
         });
         
         const tokenData = await tokenResponse.json();
+        console.log('Token response status:', tokenResponse.status);
         
         if (!tokenData.access_token) {
+            console.error('No access token received:', tokenData);
             return Response.redirect(`${url.origin}/?auth=error`, 302);
         }
+        
+        console.log('Token received, fetching user info...');
         
         // 사용자 정보 가져오기
         const userResponse = await fetch(GOOGLE_USER_INFO_URL, {
@@ -171,6 +195,7 @@ async function handleGoogleCallback(request, env) {
         });
         
         const userData = await userResponse.json();
+        console.log('User info received:', userData.email);
         
         // JWT 생성
         const payload = {
@@ -183,6 +208,8 @@ async function handleGoogleCallback(request, env) {
         const secret = env.GOOGLE_CLIENT_SECRET || 'fallback-secret';
         const jwt = await createJWT(payload, secret);
         
+        console.log('JWT created, setting cookie and redirecting...');
+        
         // 리다이렉트 응답에 쿠키 설정
         const response = Response.redirect(`${url.origin}/?auth=success`, 302);
         response.headers.set('Set-Cookie', `auth_token=${jwt}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${30 * 24 * 60 * 60}`);
@@ -190,6 +217,7 @@ async function handleGoogleCallback(request, env) {
         return response;
     } catch (error) {
         console.error('OAuth callback error:', error);
+        console.error('Error details:', error.message, error.stack);
         return Response.redirect(`${url.origin}/?auth=error`, 302);
     }
 }
