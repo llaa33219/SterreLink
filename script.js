@@ -97,73 +97,89 @@ class SterreLink {
             }
         });
 
-        // Zoom to screen center
+        // Zoom to screen center - 완전히 새로운 방식
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
 
-            const oldZoomLevel = this.zoomLevel;
-            let newZoomLevel;
-
-            if (e.deltaY > 0) {
-                newZoomLevel = Math.max(oldZoomLevel * 0.9, 0.05);
-            } else {
-                newZoomLevel = Math.min(oldZoomLevel * 1.1, 5);
-            }
-
-            if (newZoomLevel === oldZoomLevel) {
-                return; // No change
-            }
+            const oldZoom = this.zoomLevel;
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newZoom = Math.max(0.1, Math.min(5, oldZoom * zoomFactor));
             
-            const zoomRatio = newZoomLevel / oldZoomLevel;
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-
-            // Adjust view position to maintain screen center as zoom focal point
-            this.viewX = centerX - (centerX - this.viewX) * zoomRatio;
-            this.viewY = centerY - (centerY - this.viewY) * zoomRatio;
+            if (newZoom === oldZoom) return;
             
-            this.zoomLevel = newZoomLevel;
+            // 화면 중앙을 기준으로 확대/축소
+            const screenCenterX = window.innerWidth / 2;
+            const screenCenterY = window.innerHeight / 2;
+            
+            // 현재 뷰의 중심점 계산
+            const worldCenterX = (screenCenterX - this.viewX) / oldZoom;
+            const worldCenterY = (screenCenterY - this.viewY) / oldZoom;
+            
+            // 새로운 줌 레벨에서의 뷰 위치 계산
+            this.viewX = screenCenterX - worldCenterX * newZoom;
+            this.viewY = screenCenterY - worldCenterY * newZoom;
+            this.zoomLevel = newZoom;
             
             this.updateView();
         }, { passive: false });
 
         // Panning event listeners
-        const solarSystem = document.getElementById('solar-system');
+        let startTime = 0;
+        let startX = 0;
+        let startY = 0;
         
         document.body.addEventListener('mousedown', (e) => {
-            // Allow clicking on links and buttons
-            if (e.target.closest('a, button')) {
+            // Allow clicking on star, links and buttons
+            if (e.target.closest('#star, a, button')) {
                 return;
             }
-            e.preventDefault();
-            this.isDragging = true;
+            
+            startTime = Date.now();
+            startX = e.clientX;
+            startY = e.clientY;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
-            document.body.style.cursor = 'grabbing';
         });
 
         document.body.addEventListener('mousemove', (e) => {
-            if (!this.isDragging) return;
-            e.preventDefault();
+            if (startTime === 0) return;
+            
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
-            this.lastMouseX = e.clientX;
-            this.lastMouseY = e.clientY;
+            const distance = Math.sqrt(dx*dx + dy*dy);
             
-            this.viewX += dx;
-            this.viewY += dy;
+            // Only start dragging if moved more than 5px
+            if (distance > 5) {
+                this.isDragging = true;
+                document.body.style.cursor = 'grabbing';
+            }
             
-            this.updateView();
+            if (this.isDragging) {
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
+                this.viewX += dx;
+                this.viewY += dy;
+                this.updateView();
+            }
         });
         
-        document.body.addEventListener('mouseup', () => {
+        document.body.addEventListener('mouseup', (e) => {
+            const endTime = Date.now();
+            const endX = e.clientX;
+            const endY = e.clientY;
+            const timeDiff = endTime - startTime;
+            const distance = Math.sqrt((endX - startX)**2 + (endY - startY)**2);
+            
+            // Reset dragging state
             this.isDragging = false;
             document.body.style.cursor = 'default';
+            startTime = 0;
         });
         
         document.body.addEventListener('mouseleave', () => {
             this.isDragging = false;
             document.body.style.cursor = 'default';
+            startTime = 0;
         });
 
         // Window resize handling
@@ -479,11 +495,11 @@ class SterreLink {
         const solarSystem = document.getElementById('solar-system');
         const body = document.body;
         
-        // Apply both panning and zooming with proper center positioning
+        // 완전히 새로운 transform 방식
         solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
-        solarSystem.style.transformOrigin = 'center center';
+        solarSystem.style.transformOrigin = '0 0'; // 원점 기준으로 변경
         
-        // Adjust background for a parallax effect (optional but cool)
+        // Adjust background for a parallax effect
         const bgPosX = -this.viewX * 0.1;
         const bgPosY = -this.viewY * 0.1;
         body.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
