@@ -94,17 +94,16 @@ class SterreLink {
                 return; // No change
             }
             
-            // Zoom to the center of the screen
+            const zoomRatio = newZoomLevel / oldZoomLevel;
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
 
-            // The position of the screen center in world coordinates (pre-zoom)
-            const worldMouseX = (centerX - this.viewX) / oldZoomLevel;
-            const worldMouseY = (centerY - this.viewY) / oldZoomLevel;
-            
-            // The new view offset that keeps the world point under the screen center
-            this.viewX = centerX - worldMouseX * newZoomLevel;
-            this.viewY = centerY - worldMouseY * newZoomLevel;
+            // To keep the zoom centered on the screen's center, we need to adjust
+            // the view's translation. The logic is to find the vector from the view's
+            // origin to the screen center, scale it by the zoom ratio, and then
+            // set the new view origin based on that scaled vector.
+            this.viewX = centerX - (centerX - this.viewX) * zoomRatio;
+            this.viewY = centerY - (centerY - this.viewY) * zoomRatio;
             
             this.zoomLevel = newZoomLevel;
             
