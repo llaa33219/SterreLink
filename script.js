@@ -13,31 +13,47 @@ class SterreLink {
         this.isDragging = false;
         this.lastMouseX = 0;
         this.lastMouseY = 0;
-        this.viewX = 0;
-        this.viewY = 0;
+        this.viewX = window.innerWidth / 2;
+        this.viewY = window.innerHeight / 2;
         
         this.init();
     }
 
     init() {
-        this.setupEventListeners();
-        this.checkLoginStatus();
-        this.hideLoading();
+        // DOM이 완전히 로드될 때까지 기다린 후 초기화
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.setupEventListeners();
+                this.checkLoginStatus();
+                this.hideLoading();
+            });
+        } else {
+            this.setupEventListeners();
+            this.checkLoginStatus();
+            this.hideLoading();
+        }
     }
 
     setupEventListeners() {
         // 항성 클릭 (로그인 또는 북마크 추가)
-        document.getElementById('star').addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Star clicked! Login status:', this.isLoggedIn); // 디버깅용
-            
-            if (!this.isLoggedIn) {
-                this.loginWithGoogle();
-            } else {
-                this.showAddBookmarkModal();
-            }
-        });
+        const starElement = document.getElementById('star');
+        if (starElement) {
+            starElement.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Star clicked! Login status:', this.isLoggedIn); // 디버깅용
+                
+                if (!this.isLoggedIn) {
+                    console.log('Attempting Google login...');
+                    this.loginWithGoogle();
+                } else {
+                    console.log('User is logged in, showing modal...');
+                    this.showAddBookmarkModal();
+                }
+            });
+        } else {
+            console.error('Star element not found!');
+        }
 
         // Logout from new dropdown
         document.getElementById('logout-btn').addEventListener('click', () => {
@@ -149,6 +165,14 @@ class SterreLink {
             this.isDragging = false;
             document.body.style.cursor = 'default';
         });
+
+        // Window resize handling
+        window.addEventListener('resize', () => {
+            // Recenter the view when window is resized
+            this.viewX = window.innerWidth / 2;
+            this.viewY = window.innerHeight / 2;
+            this.updateView();
+        });
     }
 
     showLoading() {
@@ -245,12 +269,16 @@ class SterreLink {
         
         if (modal) {
             modal.style.display = 'block';
+            modal.style.opacity = '1';
+            modal.style.visibility = 'visible';
+            
             // 약간의 지연을 두고 포커스 설정
             setTimeout(() => {
                 if (titleInput) {
                     titleInput.focus();
                 }
             }, 100);
+            console.log('Modal should now be visible');
         } else {
             console.error('Modal element not found!');
         }
@@ -451,8 +479,9 @@ class SterreLink {
         const solarSystem = document.getElementById('solar-system');
         const body = document.body;
         
-        // Apply both panning and zooming
+        // Apply both panning and zooming with proper center positioning
         solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
+        solarSystem.style.transformOrigin = 'center center';
         
         // Adjust background for a parallax effect (optional but cool)
         const bgPosX = -this.viewX * 0.1;
@@ -558,7 +587,22 @@ if (urlParams.get('auth') === 'success') {
     window.history.replaceState({}, document.title, '/');
 }
 
-// 앱 초기화
-document.addEventListener('DOMContentLoaded', () => {
-    new SterreLink();
+// 앱 초기화 - 여러 방법으로 확실하게 초기화
+function initSterreLink() {
+    console.log('Initializing SterreLink...');
+    window.sterreLink = new SterreLink();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSterreLink);
+} else {
+    initSterreLink();
+}
+
+// 추가 보험으로 윈도우 로드 이벤트도 사용
+window.addEventListener('load', () => {
+    if (!window.sterreLink) {
+        console.log('Backup initialization...');
+        initSterreLink();
+    }
 }); 
