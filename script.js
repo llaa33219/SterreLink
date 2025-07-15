@@ -333,10 +333,15 @@ class SterreLink {
 
     getFavicon(url) {
         try {
-            const domain = new URL(url).hostname;
+            // Ensure the URL has a protocol for the URL constructor to work.
+            let fullUrl = url;
+            if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
+                fullUrl = 'https://' + fullUrl;
+            }
+            const domain = new URL(fullUrl).hostname;
             return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
         } catch (e) {
-            // If URL is invalid, use a generic fallback icon
+            // If URL is still invalid, use a generic fallback icon
             return 'https://www.google.com/s2/favicons?domain=example.com&sz=32';
         }
     }
@@ -498,12 +503,16 @@ class SterreLink {
             
             const orbitalProps = this.calculateOrbitalProperties(bookmark.url);
 
+            // Defensive check for orbitalProps
+            const radius = orbitalProps ? orbitalProps.radius.toFixed(2) : 'N/A';
+            const speed = orbitalProps ? orbitalProps.speed.toFixed(2) : 'N/A';
+
             card.innerHTML = `
                 <img src="${this.getFavicon(bookmark.url)}" alt="${bookmark.title} Favicon">
                 <h3>${bookmark.title}</h3>
                 <p>${bookmark.url}</p>
-                <p>Orbit Radius: ${orbitalProps.radius.toFixed(2)}</p>
-                <p>Orbit Speed: ${orbitalProps.speed.toFixed(2)}</p>
+                <p>Orbit Radius: ${radius}</p>
+                <p>Orbit Speed: ${speed}</p>
             `;
             container.appendChild(card);
         });
