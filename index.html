@@ -10,13 +10,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- 사용자 프로필 및 드롭다운 메뉴 -->
+    <div id="user-profile" style="display: none;">
+        <img id="user-avatar" src="" alt="User Avatar">
+        <div id="dropdown-menu" class="dropdown-content">
+            <a href="#" id="import-bookmarks-btn">북마크 가져오기</a>
+            <input type="file" id="import-bookmarks-input" accept=".html" style="display: none;">
+            <a href="#" id="settings-btn">설정</a>
+            <a href="#" id="logout-btn">로그아웃</a>
+        </div>
+    </div>
+
     <div id="universe">
         <div id="starfield"></div>
         
-        <!-- 항성 (중심) -->
+        <!-- 항성 (북마크 추가 버튼) -->
         <div id="star" class="star">
             <div id="star-content">
-                <img id="star-icon" src="https://developers.google.com/identity/images/g-logo.png" alt="Google">
+                <span id="star-add-icon">+</span>
                 <div id="star-glow"></div>
             </div>
         </div>
@@ -26,13 +37,6 @@
         
         <!-- 행성들 (북마크) -->
         <div id="planets"></div>
-        
-        <!-- UI 컨트롤 -->
-        <div id="controls">
-            <button id="zoom-in">+</button>
-            <button id="zoom-out">-</button>
-            <button id="logout" style="display: none;">로그아웃</button>
-        </div>
         
         <!-- 북마크 추가 모달 -->
         <div id="add-bookmark-modal" class="modal">

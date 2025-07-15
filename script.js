@@ -18,29 +18,39 @@ class SterreLink {
     }
 
     setupEventListeners() {
-        // 항성 클릭 (로그인 또는 북마크 추가)
+        // 항성 클릭 -> 북마크 추가 모달 열기
         document.getElementById('star').addEventListener('click', () => {
-            if (!this.isLoggedIn) {
-                this.loginWithGoogle();
-            } else {
+            if (this.isLoggedIn) {
                 this.showAddBookmarkModal();
+            } else {
+                // 로그인하지 않은 경우, 로그인 페이지로 안내하거나
+                // 간단한 알림을 표시할 수 있습니다. 여기서는 로그인 함수를 호출합니다.
+                this.loginWithGoogle();
             }
         });
 
-        // 줌 컨트롤
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            this.zoomLevel = Math.min(this.zoomLevel * 1.2, 3);
-            this.updateZoom();
+        // 사용자 프로필 드롭다운 이벤트
+        const userProfile = document.getElementById('user-profile');
+        userProfile.addEventListener('click', (e) => {
+            e.currentTarget.classList.toggle('active');
         });
-
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            this.zoomLevel = Math.max(this.zoomLevel / 1.2, 0.3);
-            this.updateZoom();
-        });
-
-        // 로그아웃
-        document.getElementById('logout').addEventListener('click', () => {
+        
+        // 드롭다운 메뉴 항목 이벤트
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
             this.logout();
+        });
+
+        document.getElementById('import-bookmarks-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('import-bookmarks-input').click();
+        });
+
+        document.getElementById('import-bookmarks-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.importBookmarks(file);
+            }
         });
 
         // 모달 관련
@@ -64,7 +74,7 @@ class SterreLink {
             }
         });
 
-        // 마우스 휠 줌
+        // 마우스 휠 줌 (기존 로직 유지)
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (e.deltaY > 0) {
@@ -92,11 +102,14 @@ class SterreLink {
             if (data.isLoggedIn) {
                 this.isLoggedIn = true;
                 this.userEmail = data.email;
-                this.updateUIForLogin();
+                this.updateUIForLogin(data); // 유저 정보 전달
                 await this.loadBookmarks();
+            } else {
+                this.updateUIForLogout();
             }
         } catch (error) {
             console.error('Login status check failed:', error);
+            this.updateUIForLogout();
         }
     }
 
@@ -116,34 +129,22 @@ class SterreLink {
     async logout() {
         try {
             await fetch('/api/auth/logout', { method: 'POST' });
-            this.isLoggedIn = false;
-            this.userEmail = null;
-            this.bookmarks = [];
-            this.updateUIForLogout();
-            this.clearPlanets();
+            window.location.reload(); // 로그아웃 후 페이지 새로고침
         } catch (error) {
             console.error('Logout failed:', error);
         }
     }
 
-    updateUIForLogin() {
-        const starContent = document.getElementById('star-content');
-        const starIcon = document.getElementById('star-icon');
-        const logoutButton = document.getElementById('logout');
+    updateUIForLogin(userData) {
+        const userProfile = document.getElementById('user-profile');
+        const userAvatar = document.getElementById('user-avatar');
         
-        starContent.classList.add('logged-in');
-        starIcon.src = 'https://lh3.googleusercontent.com/a/default-user=s96-c';
-        logoutButton.style.display = 'block';
+        userAvatar.src = userData.picture || 'https://lh3.googleusercontent.com/a/default-user=s96-c';
+        userProfile.style.display = 'block';
     }
 
     updateUIForLogout() {
-        const starContent = document.getElementById('star-content');
-        const starIcon = document.getElementById('star-icon');
-        const logoutButton = document.getElementById('logout');
-        
-        starContent.classList.remove('logged-in');
-        starIcon.src = 'https://developers.google.com/identity/images/g-logo.png';
-        logoutButton.style.display = 'none';
+        document.getElementById('user-profile').style.display = 'none';
     }
 
     async loadBookmarks() {
@@ -158,6 +159,61 @@ class SterreLink {
         }
     }
 
+    async importBookmarks(file) {
+        this.showLoading();
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const htmlContent = event.target.result;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, "text/html");
+                const links = Array.from(doc.querySelectorAll('a'));
+                
+                if (links.length === 0) {
+                    alert('북마크 파일에서 유효한 링크를 찾을 수 없습니다.');
+                    this.hideLoading();
+                    return;
+                }
+
+                const newBookmarks = links.map(link => ({
+                    title: link.textContent.trim() || '제목 없음',
+                    url: link.href
+                })).filter(b => b.url.startsWith('http')); // 유효한 URL만 필터링
+
+                if (newBookmarks.length === 0) {
+                    alert('추가할 수 있는 유효한 북마크가 없습니다.');
+                    this.hideLoading();
+                    return;
+                }
+                
+                const response = await fetch('/api/bookmarks/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bookmarks: newBookmarks })
+                });
+
+                if (!response.ok) {
+                    throw new Error('서버와 통신 중 오류가 발생했습니다.');
+                }
+                
+                const result = await response.json();
+                alert(`${result.importedCount}개의 새로운 북마크를 성공적으로 가져왔습니다!`);
+                
+                // 새로운 북마크를 반영하기 위해 페이지를 새로고침합니다.
+                window.location.reload();
+
+            } catch (error) {
+                console.error('Failed to import bookmarks:', error);
+                alert('북마크를 가져오는 중 오류가 발생했습니다.');
+            } finally {
+                // 입력 필드 초기화
+                document.getElementById('import-bookmarks-input').value = '';
+                this.hideLoading();
+            }
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+    
     showAddBookmarkModal() {
         document.getElementById('add-bookmark-modal').style.display = 'block';
         document.getElementById('bookmark-title').focus();
@@ -210,10 +266,31 @@ class SterreLink {
     }
 
     calculateOrbitRadius(index, total) {
-        const baseRadius = 120;
-        const maxRadius = Math.min(window.innerWidth, window.innerHeight) * 0.4;
-        const step = Math.min(80, (maxRadius - baseRadius) / Math.max(total - 1, 1));
-        return baseRadius + (index * step);
+        // 북마크 개수에 따라 동적으로 확장되는 맵 로직
+        const baseRadius = 120; // 가장 안쪽 궤도 반지름
+        const layerMultiplier = 1.8; // 각 층의 북마크가 이전 층의 몇 배가 될지 결정
+        
+        let layer = 0;
+        let maxPlanetsInLayer = 6;
+        let cumulativePlanets = 0;
+        let indexInLayer = 0;
+
+        while (true) {
+            cumulativePlanets += maxPlanetsInLayer;
+            if (index < cumulativePlanets) {
+                indexInLayer = index - (cumulativePlanets - maxPlanetsInLayer);
+                break;
+            }
+            maxPlanetsInLayer = Math.floor(maxPlanetsInLayer * layerMultiplier);
+            layer++;
+        }
+        
+        const layerRadius = baseRadius + (layer * 100); // 각 층 사이의 간격
+
+        // 같은 궤도 내에서 행성을 배치하기 위한 추가 로직
+        // 이 예제에서는 모든 행성을 해당 층의 동일한 반지름에 위치시킵니다.
+        // 더 복잡한 로직을 원한다면 여기를 수정할 수 있습니다.
+        return layerRadius;
     }
 
     calculateOrbitSpeed(title, url) {

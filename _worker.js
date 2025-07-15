@@ -405,48 +405,42 @@ async function handleDeleteBookmark(request, env, user, bookmarkId) {
     }
 }
 
-// --- END: NEW OAUTH2 LOGIC ---
-
-// 사용자 정보 가져오기 (세션에서)
-async function getUser(request, env) {
-    console.log('Getting user from session...');
-    
-    const cookies = request.headers.get('Cookie');
-    if (!cookies) {
-        console.log('No cookies found');
-        return null;
-    }
-    
-    const tokenMatch = cookies.match(/auth_token=([^;]+)/);
-    if (!tokenMatch) {
-        console.log('No auth token found in cookies');
-        return null;
-    }
-    
-    const sessionId = tokenMatch[1];
-    console.log('Session ID found:', sessionId);
-    
+/**
+ * Imports multiple bookmarks for the authenticated user, avoiding duplicates.
+ */
+async function handleImportBookmarks(request, env, user) {
+    console.log(`Importing bookmarks for user: ${user.email}`);
     try {
-        const sessionData = await env.KV_NAMESPACE.get(`session:${sessionId}`, { type: 'json' });
-        
-        if (!sessionData) {
-            console.log('No session data found');
-            return null;
+        const { bookmarks: newBookmarks } = await request.json();
+        if (!Array.isArray(newBookmarks) || newBookmarks.length === 0) {
+            return new Response(JSON.stringify({ error: 'No valid bookmarks provided' }), { status: 400 });
         }
+
+        const existingBookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' }) || [];
+        const existingUrls = new Set(existingBookmarks.map(b => b.url));
         
-        // 세션 만료 확인
-        if (sessionData.expiresAt < Date.now()) {
-            console.log('Session expired');
-            // 만료된 세션 삭제
-            await env.KV_NAMESPACE.delete(`session:${sessionId}`);
-            return null;
+        const uniqueNewBookmarks = newBookmarks.filter(b => b.url && !existingUrls.has(b.url)).map(b => ({
+            id: generateUUID(),
+            title: b.title || 'Untitled',
+            url: b.url,
+            createdAt: new Date().toISOString()
+        }));
+
+        if (uniqueNewBookmarks.length === 0) {
+            return new Response(JSON.stringify({ message: 'No new bookmarks to import.', importedCount: 0 }), { status: 200 });
         }
-        
-        console.log('User session found:', sessionData.email);
-        return sessionData;
+
+        const updatedBookmarks = [...existingBookmarks, ...uniqueNewBookmarks];
+        await env.KV_NAMESPACE.put(`bookmarks:${user.email}`, JSON.stringify(updatedBookmarks));
+
+        return new Response(JSON.stringify({ 
+            message: 'Bookmarks imported successfully.', 
+            importedCount: uniqueNewBookmarks.length 
+        }), { status: 201 });
+
     } catch (error) {
-        console.error('Error getting user session:', error);
-        return null;
+        console.error('Error importing bookmarks:', error);
+        return new Response(JSON.stringify({ error: 'Failed to import bookmarks' }), { status: 500 });
     }
 }
 
@@ -490,6 +484,9 @@ export default {
                 }
                 if (path === '/api/bookmarks' && request.method === 'POST') {
                     return handleAddBookmark(request, env, user);
+                }
+                if (path === '/api/bookmarks/import' && request.method === 'POST') {
+                    return handleImportBookmarks(request, env, user);
                 }
                 
                 const bookmarkIdMatch = path.match(/^\/api\/bookmarks\/([a-zA-Z0-9_-]+)$/);
