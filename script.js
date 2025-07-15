@@ -114,8 +114,8 @@ class SterreLink {
         const solarSystem = document.getElementById('solar-system');
         
         document.body.addEventListener('mousedown', (e) => {
-            // Allow clicking on links and buttons
-            if (e.target.closest('a, button')) {
+            // Allow clicking on links, buttons, or the star itself
+            if (e.target.closest('a, button, #star')) {
                 return;
             }
             e.preventDefault();
