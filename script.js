@@ -16,6 +16,10 @@ class SterreLink {
         this.viewX = 0;
         this.viewY = 0;
         
+        // Context menu state
+        this.contextMenuVisible = false;
+        this.contextMenuTargetId = null;
+
         this.init();
     }
 
@@ -134,7 +138,7 @@ class SterreLink {
         
         document.body.addEventListener('mousedown', (e) => {
             // 모달, 링크, 버튼, 항성 자체를 클릭했을 때는 패닝을 시작하지 않습니다.
-            if (e.target.closest('.modal, a, button, #star')) {
+            if (e.target.closest('.modal, a, button, #star, .context-menu')) {
                 return;
             }
             e.preventDefault();
@@ -166,6 +170,24 @@ class SterreLink {
         document.body.addEventListener('mouseleave', () => {
             this.isDragging = false;
             document.body.style.cursor = 'default';
+        });
+
+        document.body.addEventListener('click', (e) => {
+            // Hide context menu if clicking anywhere else
+            if (this.contextMenuVisible && !e.target.closest('.context-menu')) {
+                this.hideContextMenu();
+            }
+        });
+
+        // Context menu actions
+        document.getElementById('context-menu-edit').addEventListener('click', () => {
+            this.showEditBookmarkModal(this.contextMenuTargetId);
+            this.hideContextMenu();
+        });
+
+        document.getElementById('context-menu-delete').addEventListener('click', () => {
+            this.deleteBookmark(this.contextMenuTargetId);
+            this.hideContextMenu();
         });
     }
 
@@ -266,7 +288,11 @@ class SterreLink {
 
     hideAddBookmarkModal() {
         document.getElementById('add-bookmark-modal').style.display = 'none';
-        document.getElementById('bookmark-form').reset();
+        const form = document.getElementById('bookmark-form');
+        form.reset();
+        delete form.dataset.editingId; // Clear editing ID
+        document.querySelector('#add-bookmark-modal h2').textContent = '새 북마크 추가';
+        document.querySelector('#bookmark-form button[type="submit"]').textContent = '추가';
     }
 
     showBookmarkListModal() {
@@ -290,10 +316,19 @@ class SterreLink {
 
             const orbitalProperties = this.calculateOrbitalProperties(bookmark.url);
             
-            const card = document.createElement('a');
-            card.href = bookmark.url;
-            card.target = '_blank';
+            const card = document.createElement('div'); // Use div instead of <a>
             card.className = 'bookmark-card';
+            card.dataset.id = bookmark._id; // Store bookmark ID
+            
+            card.addEventListener('click', () => {
+                window.open(bookmark.url, '_blank');
+            });
+
+            card.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.showContextMenu(e.pageX, e.pageY, bookmark._id);
+            });
+
             card.innerHTML = `
                 <img src="${this.getFavicon(bookmark.url)}" class="bookmark-card-favicon" alt="">
                 <div class="bookmark-card-title">${bookmark.title}</div>
@@ -319,15 +354,22 @@ class SterreLink {
     async addBookmark() {
         const title = document.getElementById('bookmark-title').value;
         const url = document.getElementById('bookmark-url').value;
+        const editingId = document.getElementById('bookmark-form').dataset.editingId;
 
         if (!title || !url) return;
 
+        if (editingId) {
+            this.updateBookmark(editingId, title, url);
+        } else {
+            this.createNewBookmark(title, url);
+        }
+    }
+
+    async createNewBookmark(title, url) {
         try {
             const response = await fetch('/api/bookmarks', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, url })
             });
 
@@ -335,10 +377,84 @@ class SterreLink {
                 const data = await response.json();
                 this.bookmarks.push(data.bookmark);
                 this.renderPlanets();
+                this.renderBookmarkGrid();
                 this.hideAddBookmarkModal();
             }
         } catch (error) {
             console.error('Failed to add bookmark:', error);
+        }
+    }
+
+    async updateBookmark(id, title, url) {
+        try {
+            const response = await fetch(`/api/bookmarks/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, url }),
+            });
+
+            if (response.ok) {
+                const updatedBookmark = await response.json();
+                const index = this.bookmarks.findIndex(b => b._id === id);
+                if (index !== -1) {
+                    this.bookmarks[index] = updatedBookmark.bookmark;
+                }
+                this.renderPlanets();
+                this.renderBookmarkGrid();
+                this.hideAddBookmarkModal();
+            } else {
+                console.error('Failed to update bookmark');
+            }
+        } catch (error) {
+            console.error('Error updating bookmark:', error);
+        }
+    }
+
+    async deleteBookmark(id) {
+        if (!confirm('정말로 이 북마크를 삭제하시겠습니까?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                this.bookmarks = this.bookmarks.filter(b => b._id !== id);
+                this.renderPlanets();
+                this.renderBookmarkGrid();
+            } else {
+                console.error('Failed to delete bookmark');
+            }
+        } catch (error) {
+            console.error('Error deleting bookmark:', error);
+        }
+    }
+
+    showContextMenu(x, y, bookmarkId) {
+        const menu = document.getElementById('bookmark-context-menu');
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.display = 'block';
+        this.contextMenuVisible = true;
+        this.contextMenuTargetId = bookmarkId;
+    }
+
+    hideContextMenu() {
+        const menu = document.getElementById('bookmark-context-menu');
+        menu.style.display = 'none';
+        this.contextMenuVisible = false;
+        this.contextMenuTargetId = null;
+    }
+
+    showEditBookmarkModal(id) {
+        const bookmark = this.bookmarks.find(b => b._id === id);
+        if (bookmark) {
+            const form = document.getElementById('bookmark-form');
+            document.querySelector('#add-bookmark-modal h2').textContent = '북마크 수정';
+            document.getElementById('bookmark-title').value = bookmark.title;
+            document.getElementById('bookmark-url').value = bookmark.url;
+            form.dataset.editingId = id; // Store ID in form's dataset
+            document.querySelector('#bookmark-form button[type="submit"]').textContent = '수정';
+            this.showAddBookmarkModal();
         }
     }
 

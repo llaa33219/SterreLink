@@ -387,6 +387,34 @@ body.zoomed-in .planet-tooltip {
     border-color: #777;
 }
 
+/* Context Menu */
+.context-menu {
+    display: none;
+    position: fixed;
+    z-index: 3000;
+    background-color: #2c2c2c;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    overflow: hidden;
+}
+
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 5px 0;
+}
+
+.context-menu li {
+    padding: 10px 20px;
+    cursor: pointer;
+    color: #fff;
+}
+
+.context-menu li:hover {
+    background-color: #444;
+}
+
+
 /* Scrollbar styles for the grid */
 #bookmark-grid::-webkit-scrollbar {
     width: 8px;
