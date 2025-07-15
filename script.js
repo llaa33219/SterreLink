@@ -204,44 +204,48 @@ class SterreLink {
         }
     }
 
-    async deleteBookmark(bookmarkId) {
-        try {
-            const response = await fetch(`/api/bookmarks/${bookmarkId}`, {
-                method: 'DELETE'
-            });
+    /**
+     * Calculates a deterministic and unique orbit radius for each bookmark.
+     * This ensures each planet has its own distinct orbit.
+     */
+    calculateOrbitRadius(index) {
+        const BASE_RADIUS = 150; // Radius of the first orbit
+        const RADIUS_STEP = 80;  // Distance between orbits
+        return BASE_RADIUS + (index * RADIUS_STEP);
+    }
 
-            if (response.ok) {
-                this.bookmarks = this.bookmarks.filter(b => b.id !== bookmarkId);
-                this.renderPlanets();
-            }
-        } catch (error) {
-            console.error('Failed to delete bookmark:', error);
+    /**
+     * Creates a simple hash from a string.
+     * Used to generate deterministic values from bookmark URLs.
+     */
+    stringToHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = (hash << 5) - hash + char;
+            hash |= 0; // Convert to 32bit integer
         }
+        return Math.abs(hash);
     }
 
-    calculateOrbitRadius(index, total) {
-        const baseRadius = 120; // Closest orbit radius
-        const growthFactor = 1.1; // How much each orbit grows compared to the previous one
-        let radius = baseRadius;
-        for (let i = 0; i < index; i++) {
-            radius = baseRadius + (radius - baseRadius) * growthFactor;
-        }
-        return radius;
+    /**
+     * Calculates deterministic orbital properties (duration, initial angle)
+     * based on the bookmark's URL.
+     */
+    calculateOrbitalProperties(url) {
+        const hash = this.stringToHash(url);
+        
+        // Duration between 20,000 and 100,000 seconds for a very slow, epic orbit
+        const MIN_DURATION = 20000;
+        const MAX_DURATION = 100000;
+        const duration = MIN_DURATION + (hash % (MAX_DURATION - MIN_DURATION));
+
+        // Initial angle between 0 and 360 degrees
+        const initialAngle = hash % 360;
+
+        return { duration, initialAngle };
     }
 
-    calculateOrbitSpeed(title, url) {
-        // 제목과 URL 길이에 따른 공전 속도 계산
-        const titleLength = title.length;
-        const urlLength = url.length;
-        const totalLength = titleLength + urlLength;
-        
-        // 길이가 길수록 느리게 공전 (20초 ~ 60초)
-        const minDuration = 20;
-        const maxDuration = 60;
-        const duration = minDuration + ((totalLength - 10) / 50) * (maxDuration - minDuration);
-        
-        return Math.max(minDuration, Math.min(maxDuration, duration));
-    }
 
     getFavicon(url) {
         try {
@@ -257,61 +261,56 @@ class SterreLink {
         
         if (this.bookmarks.length === 0) return;
 
-        const orbitsContainer = document.getElementById('orbits');
         const planetsContainer = document.getElementById('planets');
+        const orbitsContainer = document.getElementById('orbits');
 
         this.bookmarks.forEach((bookmark, index) => {
-            const radius = this.calculateOrbitRadius(index, this.bookmarks.length);
-            const speed = this.calculateOrbitSpeed(bookmark.title, bookmark.url);
-            const angle = (index * 360) / this.bookmarks.length;
+            const orbitRadius = this.calculateOrbitRadius(index);
+            const { duration, initialAngle } = this.calculateOrbitalProperties(bookmark.url);
 
-            // 궤도 생성
-            const orbit = document.createElement('div');
-            orbit.className = 'orbit';
-            orbit.style.width = `${radius * 2}px`;
-            orbit.style.height = `${radius * 2}px`;
-            orbitsContainer.appendChild(orbit);
-            this.orbitElements.push(orbit);
+            // 1. Create Orbit Path
+            const orbitPath = document.createElement('div');
+            orbitPath.className = 'orbit';
+            orbitPath.style.width = `${orbitRadius * 2}px`;
+            orbitPath.style.height = `${orbitRadius * 2}px`;
+            orbitsContainer.appendChild(orbitPath);
 
-            // 행성 생성
-            const planet = document.createElement('div');
-            planet.className = 'planet';
-            planet.style.left = '50%';
-            planet.style.top = '50%';
-            planet.style.transformOrigin = `0 0`;
+            // 2. Create a rotation container for the planet
+            const rotationContainer = document.createElement('div');
+            rotationContainer.className = 'planet-rotation';
+            rotationContainer.style.width = `${orbitRadius * 2}px`;
+            rotationContainer.style.height = `${orbitRadius * 2}px`;
             
-            planet.innerHTML = `
-                <div class="planet-content">
-                    <div class="planet-favicon">
-                        <img src="${this.getFavicon(bookmark.url)}" alt="${bookmark.title}" onerror="this.style.display='none'; this.parentElement.innerHTML='🌐';">
-                    </div>
-                </div>
-                <div class="planet-title">${bookmark.title}</div>
-            `;
+            // Set animation properties
+            const animationDirection = index % 2 === 0 ? 'normal' : 'reverse';
+            rotationContainer.style.animation = `planet-rotation ${duration}s linear infinite ${animationDirection}`;
+            
+            // Set initial position
+            rotationContainer.style.transform = `translate(-50%, -50%) rotate(${initialAngle}deg)`;
 
-            // 행성 클릭 이벤트
-            planet.addEventListener('click', () => {
-                window.open(bookmark.url, '_blank');
-            });
+            // 3. Create Planet Element
+            const planet = document.createElement('a');
+            planet.className = 'planet';
+            planet.href = bookmark.url;
+            planet.target = '_blank';
+            planet.style.backgroundImage = `url(${this.getFavicon(bookmark.url)})`;
+            
+            // Tooltip for the planet name
+            const tooltip = document.createElement('div');
+            tooltip.className = 'planet-tooltip';
+            tooltip.textContent = bookmark.title;
+            planet.appendChild(tooltip);
 
-            // 행성 우클릭 이벤트 (삭제)
-            planet.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                if (confirm(`"${bookmark.title}" 북마크를 삭제하시겠습니까?`)) {
-                    this.deleteBookmark(bookmark.id);
-                }
-            });
+            // Add planet to its rotation container
+            rotationContainer.appendChild(planet);
+            planetsContainer.appendChild(rotationContainer);
 
-            planetsContainer.appendChild(planet);
-            this.planetElements.push({
-                element: planet,
-                radius: radius,
-                speed: speed,
-                angle: angle,
-                currentAngle: angle
-            });
+            // Store elements for cleanup
+            this.orbitElements.push(orbitPath);
+            this.planetElements.push(rotationContainer);
         });
 
+        // Start animation (now handled by CSS, but we keep the function in case we need it later)
         this.startAnimation();
     }
 
@@ -331,21 +330,12 @@ class SterreLink {
     }
 
     startAnimation() {
-        const animate = () => {
-            this.planetElements.forEach(planet => {
-                planet.currentAngle += 360 / (planet.speed * 60); // 60fps 기준
-                
-                const radians = (planet.currentAngle * Math.PI) / 180;
-                const x = planet.radius * Math.cos(radians);
-                const y = planet.radius * Math.sin(radians);
-                
-                planet.element.style.transform = `translate(${x}px, ${y}px)`;
-            });
-            
-            this.animationId = requestAnimationFrame(animate);
-        };
-        
-        animate();
+        // JS-based animation loop is no longer needed for position updates.
+        // We can keep the rAF loop for other potential real-time updates if necessary.
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+        // this.animationId = requestAnimationFrame(() => this.startAnimation());
     }
 
     updateZoom() {

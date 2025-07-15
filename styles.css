@@ -105,6 +105,7 @@ body {
     transform-origin: center;
     top: 50%;
     left: 50%;
+    transform: translate(-50%, -50%); /* Ensure orbits are centered */
 }
 
 #planets {
@@ -113,8 +114,19 @@ body {
     left: 50%;
 }
 
+.planet-rotation {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: center;
+    /* transform: translate(-50%, -50%); will be set by JS */
+}
+
 .planet {
     position: absolute;
+    top: 0; /* Positioned at the top of the rotation container */
+    left: 50%;
+    transform: translate(-50%, -50%); /* Center the planet on its path */
     width: 32px;
     height: 32px;
     background-color: #fff;
@@ -127,10 +139,11 @@ body {
     background-size: cover;
     background-position: center;
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    text-decoration: none; /* Remove underline from link */
 }
 
 .planet:hover {
-    transform: scale(1.2);
+    transform: translate(-50%, -50%) scale(1.2);
     z-index: 100;
 }
 
@@ -161,6 +174,15 @@ body {
 .planet:hover .planet-tooltip {
     visibility: visible;
     opacity: 1;
+}
+
+@keyframes planet-rotation {
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
 }
 
 #user-profile-widget {

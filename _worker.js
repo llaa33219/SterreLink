@@ -414,73 +414,6 @@ async function handleBulkAddBookmarks(request, env, user) {
     }
 }
 
-/**
- * Deletes a bookmark for the authenticated user.
- */
-async function handleDeleteBookmark(request, env, user, bookmarkId) {
-    console.log(`Deleting bookmark ${bookmarkId} for user: ${user.email}`);
-    try {
-        const existingBookmarks = await env.KV_NAMESPACE.get(`bookmarks:${user.email}`, { type: 'json' }) || [];
-        const updatedBookmarks = existingBookmarks.filter(b => b.id !== bookmarkId);
-
-        if (existingBookmarks.length === updatedBookmarks.length) {
-            return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-        }
-
-        await env.KV_NAMESPACE.put(`bookmarks:${user.email}`, JSON.stringify(updatedBookmarks));
-
-        return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
-    } catch (error) {
-        console.error(`Error deleting bookmark ${bookmarkId}:`, error);
-        return new Response(JSON.stringify({ error: 'Failed to delete bookmark' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-    }
-}
-
-// --- END: NEW OAUTH2 LOGIC ---
-
-// 사용자 정보 가져오기 (세션에서)
-async function getUser(request, env) {
-    console.log('Getting user from session...');
-    
-    const cookies = request.headers.get('Cookie');
-    if (!cookies) {
-        console.log('No cookies found');
-        return null;
-    }
-    
-    const tokenMatch = cookies.match(/auth_token=([^;]+)/);
-    if (!tokenMatch) {
-        console.log('No auth token found in cookies');
-        return null;
-    }
-    
-    const sessionId = tokenMatch[1];
-    console.log('Session ID found:', sessionId);
-    
-    try {
-        const sessionData = await env.KV_NAMESPACE.get(`session:${sessionId}`, { type: 'json' });
-        
-        if (!sessionData) {
-            console.log('No session data found');
-            return null;
-        }
-        
-        // 세션 만료 확인
-        if (sessionData.expiresAt < Date.now()) {
-            console.log('Session expired');
-            // 만료된 세션 삭제
-            await env.KV_NAMESPACE.delete(`session:${sessionId}`);
-            return null;
-        }
-        
-        console.log('User session found:', sessionData.email);
-        return sessionData;
-    } catch (error) {
-        console.error('Error getting user session:', error);
-        return null;
-    }
-}
-
 // 라우팅 및 요청 처리
 export default {
     async fetch(request, env, ctx) {
@@ -524,12 +457,6 @@ export default {
                 }
                 if (path === '/api/bookmarks/bulk' && request.method === 'POST') {
                     return handleBulkAddBookmarks(request, env, user);
-                }
-                
-                const bookmarkIdMatch = path.match(/^\/api\/bookmarks\/([a-zA-Z0-9_-]+)$/);
-                if (bookmarkIdMatch && request.method === 'DELETE') {
-                    const bookmarkId = bookmarkIdMatch[1];
-                    return handleDeleteBookmark(request, env, user, bookmarkId);
                 }
             }
 
