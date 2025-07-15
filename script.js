@@ -27,7 +27,11 @@ class SterreLink {
 
     setupEventListeners() {
         // 항성 클릭 (로그인 또는 북마크 추가)
-        document.getElementById('star').addEventListener('click', () => {
+        document.getElementById('star').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Star clicked! Login status:', this.isLoggedIn); // 디버깅용
+            
             if (!this.isLoggedIn) {
                 this.loginWithGoogle();
             } else {
@@ -77,7 +81,7 @@ class SterreLink {
             }
         });
 
-        // Zoom to cursor
+        // Zoom to screen center
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
 
@@ -98,10 +102,7 @@ class SterreLink {
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
 
-            // To keep the zoom centered on the screen's center, we need to adjust
-            // the view's translation. The logic is to find the vector from the view's
-            // origin to the screen center, scale it by the zoom ratio, and then
-            // set the new view origin based on that scaled vector.
+            // Adjust view position to maintain screen center as zoom focal point
             this.viewX = centerX - (centerX - this.viewX) * zoomRatio;
             this.viewY = centerY - (centerY - this.viewY) * zoomRatio;
             
@@ -115,7 +116,7 @@ class SterreLink {
         
         document.body.addEventListener('mousedown', (e) => {
             // Allow clicking on links and buttons
-            if (e.target.closest('a, button, #star')) {
+            if (e.target.closest('a, button')) {
                 return;
             }
             e.preventDefault();
@@ -238,13 +239,34 @@ class SterreLink {
     }
 
     showAddBookmarkModal() {
-        document.getElementById('add-bookmark-modal').style.display = 'block';
-        document.getElementById('bookmark-title').focus();
+        console.log('Showing add bookmark modal...'); // 디버깅용
+        const modal = document.getElementById('add-bookmark-modal');
+        const titleInput = document.getElementById('bookmark-title');
+        
+        if (modal) {
+            modal.style.display = 'block';
+            // 약간의 지연을 두고 포커스 설정
+            setTimeout(() => {
+                if (titleInput) {
+                    titleInput.focus();
+                }
+            }, 100);
+        } else {
+            console.error('Modal element not found!');
+        }
     }
 
     hideAddBookmarkModal() {
-        document.getElementById('add-bookmark-modal').style.display = 'none';
-        document.getElementById('bookmark-form').reset();
+        console.log('Hiding add bookmark modal...'); // 디버깅용
+        const modal = document.getElementById('add-bookmark-modal');
+        const form = document.getElementById('bookmark-form');
+        
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        if (form) {
+            form.reset();
+        }
     }
 
     async addBookmark() {
