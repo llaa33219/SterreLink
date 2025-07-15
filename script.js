@@ -77,16 +77,38 @@ class SterreLink {
             }
         });
 
-        // 마우스 휠 줌
+        // Zoom to cursor
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
+
+            const oldZoomLevel = this.zoomLevel;
+            let newZoomLevel;
+
             if (e.deltaY > 0) {
-                this.zoomLevel = Math.max(this.zoomLevel * 0.9, 0.05); // Allow more zoom-out
+                newZoomLevel = Math.max(oldZoomLevel * 0.9, 0.05);
             } else {
-                this.zoomLevel = Math.min(this.zoomLevel * 1.1, 5); // Allow more zoom-in
+                newZoomLevel = Math.min(oldZoomLevel * 1.1, 5);
             }
-            this.updateZoom();
-        }, { passive: false }); // Explicitly set passive to false to prevent console warnings
+
+            if (newZoomLevel === oldZoomLevel) {
+                return; // No change
+            }
+            
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+
+            // The position of the mouse in world coordinates (pre-zoom)
+            const worldMouseX = (mouseX - this.viewX) / oldZoomLevel;
+            const worldMouseY = (mouseY - this.viewY) / oldZoomLevel;
+            
+            // The new view offset that keeps the world point under the mouse
+            this.viewX = mouseX - worldMouseX * newZoomLevel;
+            this.viewY = mouseY - worldMouseY * newZoomLevel;
+            
+            this.zoomLevel = newZoomLevel;
+            
+            this.updateView();
+        }, { passive: false });
 
         // Panning event listeners
         const solarSystem = document.getElementById('solar-system');
