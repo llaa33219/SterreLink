@@ -18,9 +18,14 @@
         <img id="user-profile-pic" src="" alt="User Profile">
         <div id="user-dropdown" class="dropdown-content">
             <a id="import-bookmarks-btn">Import Bookmarks</a>
-            <a id="list-view-btn">List View</a>
             <a id="logout-btn">Logout</a>
         </div>
+    </div>
+
+    <div id="list-view-button-container" style="display: none;">
+        <button id="list-view-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-list"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+        </button>
     </div>
 
     <div id="solar-system">
@@ -73,14 +78,15 @@
         </div>
     </div>
 
-    <!-- The Modal for List View -->
-    <div id="list-view-modal" class="modal">
-        <div class="modal-content">
-            <span class="close-list-view">&times;</span>
-            <h2>Bookmark List</h2>
-            <input type="text" id="list-search-input" placeholder="Search by title or URL...">
-            <div id="list-view-container">
-                <!-- Bookmark cards will be inserted here by JavaScript -->
+    <div id="bookmark-list-modal" class="modal">
+        <div class="modal-content wide">
+            <span class="close-list">&times;</span>
+            <h2>북마크 목록</h2>
+            <div class="search-container">
+                <input type="text" id="bookmark-search-input" placeholder="제목 또는 URL로 검색...">
+            </div>
+            <div id="bookmark-grid" class="bookmark-grid">
+                <!-- 북마크 카드가 여기에 동적으로 추가됩니다. -->
             </div>
         </div>
     </div>

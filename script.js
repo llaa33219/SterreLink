@@ -40,24 +40,14 @@ class SterreLink {
             this.logout();
         });
         
-        // List View button
-        document.getElementById('list-view-btn').addEventListener('click', () => {
-            this.showListViewModal();
-        });
-
-        // Close List View modal
-        document.querySelector('.close-list-view').addEventListener('click', () => {
-            this.hideListViewModal();
-        });
-
-        // Search in List View
-        document.getElementById('list-search-input').addEventListener('input', (e) => {
-            this.filterBookmarkCards(e.target.value);
-        });
-
         // Import bookmarks
         document.getElementById('import-bookmarks-btn').addEventListener('click', () => {
             this.showImportBookmarksModal();
+        });
+
+        // List view button
+        document.getElementById('list-view-btn').addEventListener('click', () => {
+            this.showBookmarkListModal();
         });
 
         // Modal-related for import
@@ -83,6 +73,16 @@ class SterreLink {
         document.getElementById('bookmark-form').addEventListener('submit', (e) => {
             e.preventDefault();
             this.addBookmark();
+        });
+
+        // Close list modal
+        document.querySelector('.close-list').addEventListener('click', () => {
+            this.hideBookmarkListModal();
+        });
+
+        // Search functionality
+        document.getElementById('bookmark-search-input').addEventListener('input', (e) => {
+            this.filterBookmarks(e.target.value);
         });
 
         // 모달 바깥 클릭시 닫기
@@ -230,6 +230,8 @@ class SterreLink {
         // Hide old logout button if it exists
         const oldLogoutButton = document.getElementById('logout');
         if(oldLogoutButton) oldLogoutButton.style.display = 'none';
+
+        document.getElementById('list-view-button-container').style.display = 'block';
     }
 
     updateUIForLogout() {
@@ -238,6 +240,7 @@ class SterreLink {
 
         // Hide user profile widget
         document.getElementById('user-profile-widget').style.display = 'none';
+        document.getElementById('list-view-button-container').style.display = 'none';
     }
 
     async loadBookmarks() {
@@ -260,6 +263,50 @@ class SterreLink {
     hideAddBookmarkModal() {
         document.getElementById('add-bookmark-modal').style.display = 'none';
         document.getElementById('bookmark-form').reset();
+    }
+
+    showBookmarkListModal() {
+        this.renderBookmarkGrid();
+        document.getElementById('bookmark-list-modal').style.display = 'block';
+    }
+
+    hideBookmarkListModal() {
+        document.getElementById('bookmark-list-modal').style.display = 'none';
+        document.getElementById('bookmark-search-input').value = '';
+    }
+
+    renderBookmarkGrid(filteredBookmarks = null) {
+        const grid = document.getElementById('bookmark-grid');
+        grid.innerHTML = '';
+        const bookmarksToRender = filteredBookmarks || this.bookmarks;
+
+        bookmarksToRender.forEach(bookmark => {
+            const { rotationSpeed, distanceFromStar } = this.calculateOrbitalProperties(bookmark.url);
+            
+            const card = document.createElement('a');
+            card.href = bookmark.url;
+            card.target = '_blank';
+            card.className = 'bookmark-card';
+            card.innerHTML = `
+                <img src="${this.getFavicon(bookmark.url)}" class="bookmark-card-favicon" alt="">
+                <div class="bookmark-card-title">${bookmark.title}</div>
+                <div class="bookmark-card-url">${bookmark.url}</div>
+                <div class="bookmark-card-info">
+                    <span>자전 속도: ${rotationSpeed.toFixed(2)}</span> | 
+                    <span>항성 거리: ${distanceFromStar.toFixed(0)}</span>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+
+    filterBookmarks(searchTerm) {
+        const lowerCaseTerm = searchTerm.toLowerCase();
+        const filtered = this.bookmarks.filter(bookmark => {
+            return bookmark.title.toLowerCase().includes(lowerCaseTerm) || 
+                   bookmark.url.toLowerCase().includes(lowerCaseTerm);
+        });
+        this.renderBookmarkGrid(filtered);
     }
 
     async addBookmark() {
@@ -307,9 +354,9 @@ class SterreLink {
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
             hash = (hash << 5) - hash + char;
-            hash |= 0; // Convert to 31-bit integer
+            hash |= 0; // Convert to 32bit integer
         }
-        return hash;
+        return Math.abs(hash);
     }
 
     /**
@@ -317,30 +364,17 @@ class SterreLink {
      * based on the bookmark's URL.
      */
     calculateOrbitalProperties(url) {
-        // If URL is missing, return some default values to avoid crashing.
-        if (!url) {
-            return { radius: 150, speed: 0.8 }; 
-        }
-
         const hash = this.stringToHash(url);
-        const index = this.bookmarks.findIndex(b => b.url === url);
-
-        if (index !== -1) {
-            const baseRadius = this.calculateOrbitRadius(index);
-
-            const radiusVariation = (hash % 100 / 100) * 20 - 10; // -10 to +10 variation
-            const speedVariation = (hash % 1000 / 1000) * 0.4 - 0.2; // -0.2 to +0.2 variation
-
-            return {
-                radius: baseRadius + radiusVariation,
-                speed: 1 + speedVariation // Base speed of 1
-            };
-        }
         
-        // Fallback for when bookmark not found (should be rare), calculate from hash
-        const radius = 200 + (Math.abs(hash) % 200);
-        const speed = 0.5 + (Math.abs(hash % 1000) / 2000);
-        return { radius, speed };
+        // Duration between 300s (5min) and 1800s (30min) for a visible but slow orbit.
+        const MIN_DURATION_S = 300;
+        const MAX_DURATION_S = 1800;
+        const duration = MIN_DURATION_S + (hash % (MAX_DURATION_S - MIN_DURATION_S));
+
+        // Initial angle between 0 and 360 degrees
+        const initialAngle = hash % 360;
+
+        return { duration, initialAngle };
     }
 
 
@@ -474,69 +508,20 @@ class SterreLink {
 
     hideImportBookmarksModal() {
         document.getElementById('import-bookmarks-modal').style.display = 'none';
-        document.getElementById('import-file-input').value = '';
+        document.getElementById('bookmark-file-input').value = '';
+        document.getElementById('import-status').textContent = '';
     }
 
-    showListViewModal() {
-        this.renderBookmarkCards();
-        document.getElementById('list-view-modal').style.display = 'block';
-    }
-
-    hideListViewModal() {
-        document.getElementById('list-view-modal').style.display = 'none';
-        document.getElementById('list-search-input').value = '';
-    }
-
-    renderBookmarkCards(filter = '') {
-        const container = document.getElementById('list-view-container');
-        container.innerHTML = '';
-
-        const lowerCaseFilter = filter.toLowerCase();
-
-        const filteredBookmarks = this.bookmarks.filter(b => {
-            // Gracefully handle bookmarks that might be missing properties
-            const titleMatch = b && b.title && typeof b.title === 'string' && b.title.toLowerCase().includes(lowerCaseFilter);
-            const urlMatch = b && b.url && typeof b.url === 'string' && b.url.toLowerCase().includes(lowerCaseFilter);
-            return titleMatch || urlMatch;
-        });
+    handleBookmarkFile() {
+        const fileInput = document.getElementById('bookmark-file-input');
+        const statusEl = document.getElementById('import-status');
         
-        if (filteredBookmarks.length === 0) {
-            container.innerHTML = '<p>No matching bookmarks found.</p>';
-            return;
-        }
-
-        filteredBookmarks.forEach(bookmark => {
-            const card = document.createElement('div');
-            card.className = 'bookmark-card';
-            card.addEventListener('click', () => {
-                window.open(bookmark.url, '_blank');
-            });
-            
-            const orbitalProps = this.calculateOrbitalProperties(bookmark.url);
-
-            card.innerHTML = `
-                <img src="${this.getFavicon(bookmark.url)}" alt="${bookmark.title} Favicon">
-                <h3>${bookmark.title}</h3>
-                <p>${bookmark.url}</p>
-                <p>Orbit Radius: ${orbitalProps.radius.toFixed(2)}</p>
-                <p>Orbit Speed: ${orbitalProps.speed.toFixed(2)}</p>
-            `;
-            container.appendChild(card);
-        });
-    }
-
-    filterBookmarkCards(filter) {
-        this.renderBookmarkCards(filter);
-    }
-
-    async handleBookmarkFile() {
-        const input = document.getElementById('import-file-input');
-        if (!input.files || input.files.length === 0) {
+        if (!fileInput.files.length) {
             statusEl.textContent = 'Please select a file first.';
             return;
         }
 
-        const file = input.files[0];
+        const file = fileInput.files[0];
         const reader = new FileReader();
 
         reader.onload = async (event) => {
