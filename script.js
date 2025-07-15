@@ -318,11 +318,11 @@ class SterreLink {
 
     getFavicon(url) {
         try {
-            // Use a more modern and reliable favicon service
-            return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(url)}&size=32`;
-        } catch (error) {
-            // Fallback for invalid URLs
-            return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjRkZGIi8+Cjwvc3ZnPgo=';
+            const domain = new URL(url).hostname;
+            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        } catch (e) {
+            // If URL is invalid, use a generic fallback icon
+            return 'https://www.google.com/s2/favicons?domain=example.com&sz=32';
         }
     }
 
@@ -438,19 +438,6 @@ class SterreLink {
         solarSystem.style.transition = 'none';
 
         solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
-        
-        // Adjust background for a parallax effect (optional but cool)
-        const bgPosX = -this.viewX * 0.1;
-        const bgPosY = -this.viewY * 0.1;
-        body.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
-        body.style.backgroundSize = `${400 / this.zoomLevel}% ${400 / this.zoomLevel}%`;
-
-        // Add/remove class for showing tooltips when zoomed in
-        if (this.zoomLevel > 1.5) {
-            body.classList.add('zoomed-in');
-        } else {
-            body.classList.remove('zoomed-in');
-        }
     }
 
     showImportBookmarksModal() {
