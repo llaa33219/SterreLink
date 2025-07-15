@@ -10,13 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- 사용자 프로필 및 드롭다운 메뉴 -->
-    <div id="user-profile" style="display: none;">
+    <!-- 사용자 프로필 -->
+    <div id="user-profile" class="hidden">
         <img id="user-avatar" src="" alt="User Avatar">
-        <div id="dropdown-menu" class="dropdown-content">
+        <div id="user-menu" class="dropdown-content">
             <a href="#" id="import-bookmarks-btn">북마크 가져오기</a>
             <input type="file" id="import-bookmarks-input" accept=".html" style="display: none;">
-            <a href="#" id="settings-btn">설정</a>
             <a href="#" id="logout-btn">로그아웃</a>
         </div>
     </div>

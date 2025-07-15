@@ -29,10 +29,13 @@ class SterreLink {
             }
         });
 
-        // 사용자 프로필 드롭다운 이벤트
+        // 사용자 프로필 메뉴 이벤트
         const userProfile = document.getElementById('user-profile');
         userProfile.addEventListener('click', (e) => {
-            e.currentTarget.classList.toggle('active');
+            // 메뉴 자체를 클릭한게 아니면 (자식요소 제외) 메뉴를 토글
+            if (e.target === userProfile || e.target === document.getElementById('user-avatar')) {
+                e.currentTarget.classList.toggle('active');
+            }
         });
         
         // 드롭다운 메뉴 항목 이벤트
@@ -102,9 +105,11 @@ class SterreLink {
             if (data.isLoggedIn) {
                 this.isLoggedIn = true;
                 this.userEmail = data.email;
-                this.updateUIForLogin(data); // 유저 정보 전달
+                this.updateUIForLogin(data);
                 await this.loadBookmarks();
             } else {
+                this.isLoggedIn = false;
+                this.userEmail = null;
                 this.updateUIForLogout();
             }
         } catch (error) {
@@ -129,7 +134,11 @@ class SterreLink {
     async logout() {
         try {
             await fetch('/api/auth/logout', { method: 'POST' });
-            window.location.reload(); // 로그아웃 후 페이지 새로고침
+            this.isLoggedIn = false;
+            this.userEmail = null;
+            this.bookmarks = [];
+            this.updateUIForLogout();
+            this.clearPlanets();
         } catch (error) {
             console.error('Logout failed:', error);
         }
@@ -140,14 +149,16 @@ class SterreLink {
         const userAvatar = document.getElementById('user-avatar');
         
         userAvatar.src = userData.picture || 'https://lh3.googleusercontent.com/a/default-user=s96-c';
-        userProfile.style.display = 'block';
+        userProfile.classList.remove('hidden');
     }
 
     updateUIForLogout() {
-        document.getElementById('user-profile').style.display = 'none';
+        document.getElementById('user-profile').classList.add('hidden');
+        document.getElementById('user-profile').classList.remove('active'); // 메뉴 닫기
     }
 
     async loadBookmarks() {
+        if (!this.isLoggedIn) return; // 로그인 상태가 아닐 경우 북마크 로드 방지
         try {
             const response = await fetch('/api/bookmarks');
             const data = await response.json();
