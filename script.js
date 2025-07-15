@@ -307,9 +307,9 @@ class SterreLink {
         for (let i = 0; i < str.length; i++) {
             const char = str.charCodeAt(i);
             hash = (hash << 5) - hash + char;
-            hash |= 0; // Convert to 32bit integer
+            hash |= 0; // Convert to 31-bit integer
         }
-        return Math.abs(hash);
+        return hash;
     }
 
     /**
@@ -317,31 +317,39 @@ class SterreLink {
      * based on the bookmark's URL.
      */
     calculateOrbitalProperties(url) {
+        // If URL is missing, return some default values to avoid crashing.
+        if (!url) {
+            return { radius: 150, speed: 0.8 }; 
+        }
+
         const hash = this.stringToHash(url);
+        const index = this.bookmarks.findIndex(b => b.url === url);
+
+        if (index !== -1) {
+            const baseRadius = this.calculateOrbitRadius(index);
+
+            const radiusVariation = (hash % 100 / 100) * 20 - 10; // -10 to +10 variation
+            const speedVariation = (hash % 1000 / 1000) * 0.4 - 0.2; // -0.2 to +0.2 variation
+
+            return {
+                radius: baseRadius + radiusVariation,
+                speed: 1 + speedVariation // Base speed of 1
+            };
+        }
         
-        // Duration between 300s (5min) and 1800s (30min) for a visible but slow orbit.
-        const MIN_DURATION_S = 300;
-        const MAX_DURATION_S = 1800;
-        const duration = MIN_DURATION_S + (hash % (MAX_DURATION_S - MIN_DURATION_S));
-
-        // Initial angle between 0 and 360 degrees
-        const initialAngle = hash % 360;
-
-        return { duration, initialAngle };
+        // Fallback for when bookmark not found (should be rare), calculate from hash
+        const radius = 200 + (Math.abs(hash) % 200);
+        const speed = 0.5 + (Math.abs(hash % 1000) / 2000);
+        return { radius, speed };
     }
 
 
     getFavicon(url) {
         try {
-            // Ensure the URL has a protocol for the URL constructor to work.
-            let fullUrl = url;
-            if (!fullUrl.startsWith('http://') && !fullUrl.startsWith('https://')) {
-                fullUrl = 'https://' + fullUrl;
-            }
-            const domain = new URL(fullUrl).hostname;
+            const domain = new URL(url).hostname;
             return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
         } catch (e) {
-            // If URL is still invalid, use a generic fallback icon
+            // If URL is invalid, use a generic fallback icon
             return 'https://www.google.com/s2/favicons?domain=example.com&sz=32';
         }
     }
@@ -486,7 +494,10 @@ class SterreLink {
         const lowerCaseFilter = filter.toLowerCase();
 
         const filteredBookmarks = this.bookmarks.filter(b => {
-            return b.title.toLowerCase().includes(lowerCaseFilter) || b.url.toLowerCase().includes(lowerCaseFilter);
+            // Gracefully handle bookmarks that might be missing properties
+            const titleMatch = b && b.title && typeof b.title === 'string' && b.title.toLowerCase().includes(lowerCaseFilter);
+            const urlMatch = b && b.url && typeof b.url === 'string' && b.url.toLowerCase().includes(lowerCaseFilter);
+            return titleMatch || urlMatch;
         });
         
         if (filteredBookmarks.length === 0) {
@@ -503,16 +514,12 @@ class SterreLink {
             
             const orbitalProps = this.calculateOrbitalProperties(bookmark.url);
 
-            // Defensive check for orbitalProps
-            const radius = orbitalProps ? orbitalProps.radius.toFixed(2) : 'N/A';
-            const speed = orbitalProps ? orbitalProps.speed.toFixed(2) : 'N/A';
-
             card.innerHTML = `
                 <img src="${this.getFavicon(bookmark.url)}" alt="${bookmark.title} Favicon">
                 <h3>${bookmark.title}</h3>
                 <p>${bookmark.url}</p>
-                <p>Orbit Radius: ${radius}</p>
-                <p>Orbit Speed: ${speed}</p>
+                <p>Orbit Radius: ${orbitalProps.radius.toFixed(2)}</p>
+                <p>Orbit Speed: ${orbitalProps.speed.toFixed(2)}</p>
             `;
             container.appendChild(card);
         });
