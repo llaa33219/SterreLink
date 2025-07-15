@@ -398,8 +398,15 @@ class SterreLink {
         
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
+            this.animationId = null;
         }
-        
+    }
+
+    startAnimation() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+        }
+
         const animate = () => {
             const now = Date.now();
 
