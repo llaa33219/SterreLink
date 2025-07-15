@@ -116,7 +116,7 @@ function generateUUID() {
 // CORS 헤더 설정
 function setCORSHeaders(response) {
     response.headers.set('Access-Control-Allow-Origin', '*');
-    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     return response;
 }
@@ -458,13 +458,62 @@ async function handleBulkAddBookmarks(request, env, user) {
     }
 }
 
+async function handleUpdateBookmark(request, env, user, bookmarkId) {
+    console.log(`Updating bookmark ${bookmarkId} for user ${user.email}`);
+    
+    const { title, url } = await request.json();
+    if (!title || !url) {
+        return new Response(JSON.stringify({ error: 'Missing title or url' }), { status: 400 });
+    }
+
+    const userBookmarksKey = `bookmarks:${user.email}`;
+    let bookmarks = await env.KV_NAMESPACE.get(userBookmarksKey, { type: 'json' }) || [];
+
+    const bookmarkIndex = bookmarks.findIndex(b => b.id === bookmarkId);
+    if (bookmarkIndex === -1) {
+        return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404 });
+    }
+
+    const updatedBookmark = {
+        ...bookmarks[bookmarkIndex],
+        title,
+        url,
+        updatedAt: new Date().toISOString()
+    };
+    bookmarks[bookmarkIndex] = updatedBookmark;
+
+    await env.KV_NAMESPACE.put(userBookmarksKey, JSON.stringify(bookmarks));
+
+    return new Response(JSON.stringify({ message: 'Bookmark updated', bookmark: updatedBookmark }), { status: 200 });
+}
+
+
+async function handleDeleteBookmark(request, env, user, bookmarkId) {
+    console.log(`Deleting bookmark ${bookmarkId} for user ${user.email}`);
+    
+    const userBookmarksKey = `bookmarks:${user.email}`;
+    let bookmarks = await env.KV_NAMESPACE.get(userBookmarksKey, { type: 'json' }) || [];
+
+    const initialLength = bookmarks.length;
+    bookmarks = bookmarks.filter(b => b.id !== bookmarkId);
+
+    if (bookmarks.length === initialLength) {
+        return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404 });
+    }
+
+    await env.KV_NAMESPACE.put(userBookmarksKey, JSON.stringify(bookmarks));
+    
+    return new Response(JSON.stringify({ message: 'Bookmark deleted' }), { status: 200 });
+}
+
+
 // 라우팅 및 요청 처리
 export default {
     async fetch(request, env, ctx) {
         const url = new URL(request.url);
-        const path = url.pathname;
+        const pathname = url.pathname;
 
-        console.log(`Request received: ${request.method} ${path}`);
+        console.log(`Request received: ${request.method} ${pathname}`);
 
         // CORS Preflight 요청 처리
         if (request.method === 'OPTIONS') {
@@ -473,39 +522,45 @@ export default {
 
         try {
             // 인증 라우트
-            if (path === '/api/auth/google') {
+            if (pathname === '/api/auth/google') {
                 return handleGoogleAuth(request, env);
             }
-            if (path === '/api/auth/callback') {
+            if (pathname === '/api/auth/callback') {
                 return handleGoogleCallback(request, env);
             }
-            if (path === '/api/auth/status') {
+            if (pathname === '/api/auth/status') {
                 return handleAuthStatus(request, env);
             }
-            if (path === '/api/auth/logout') {
+            if (pathname === '/api/auth/logout') {
                 return handleLogout(request, env);
             }
 
             // 북마크 API 라우트 (인증 필요)
-            if (path.startsWith('/api/bookmarks')) {
-                const user = await getUser(request, env);
-                if (!user) {
-                    return setCORSHeaders(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
-                }
+            const user = await getUser(request, env);
+            if (!user) {
+                return setCORSHeaders(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
+            }
 
-                if (path === '/api/bookmarks' && request.method === 'GET') {
-                    return handleGetBookmarks(request, env, user);
-                }
-                if (path === '/api/bookmarks' && request.method === 'POST') {
-                    return handleAddBookmark(request, env, user);
-                }
-                if (path === '/api/bookmarks/bulk' && request.method === 'POST') {
-                    return handleBulkAddBookmarks(request, env, user);
-                }
+            let response;
+            // Bookmark routes
+            const bookmarkMatch = pathname.match(/^\/api\/bookmarks\/([a-zA-Z0-9-]+)$/);
+
+            if (pathname === '/api/bookmarks' && request.method === 'GET') {
+                response = await handleGetBookmarks(request, env, user);
+            } else if (pathname === '/api/bookmarks' && request.method === 'POST') {
+                response = await handleAddBookmark(request, env, user);
+            } else if (pathname === '/api/bookmarks/bulk' && request.method === 'POST') {
+                response = await handleBulkAddBookmarks(request, env, user);
+            } else if (bookmarkMatch && request.method === 'PUT') {
+                const bookmarkId = bookmarkMatch[1];
+                response = await handleUpdateBookmark(request, env, user, bookmarkId);
+            } else if (bookmarkMatch && request.method === 'DELETE') {
+                const bookmarkId = bookmarkMatch[1];
+                response = await handleDeleteBookmark(request, env, user, bookmarkId);
             }
 
             // 디버그용 라우트 (필요 시 사용)
-            if (path === '/api/debug/env' && env.ENVIRONMENT === 'development') {
+            if (pathname === '/api/debug/env' && env.ENVIRONMENT === 'development') {
                 return handleDebugEnv(request, env);
             }
             
