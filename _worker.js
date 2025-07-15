@@ -510,62 +510,66 @@ async function handleDeleteBookmark(request, env, user, bookmarkId) {
 // 라우팅 및 요청 처리
 export default {
     async fetch(request, env, ctx) {
-        const url = new URL(request.url);
-        const pathname = url.pathname;
-
-        console.log(`Request received: ${request.method} ${pathname}`);
-
-        // CORS Preflight 요청 처리
-        if (request.method === 'OPTIONS') {
-            return setCORSHeaders(new Response(null, { status: 204 }));
-        }
-
         try {
-            // 인증 라우트
-            if (pathname === '/api/auth/google') {
-                return handleGoogleAuth(request, env);
-            }
-            if (pathname === '/api/auth/callback') {
-                return handleGoogleCallback(request, env);
-            }
-            if (pathname === '/api/auth/status') {
-                return handleAuthStatus(request, env);
-            }
-            if (pathname === '/api/auth/logout') {
-                return handleLogout(request, env);
-            }
+            const url = new URL(request.url);
+            const pathname = url.pathname;
+            console.log(`Request received: ${request.method} ${pathname}`);
 
-            // 북마크 API 라우트 (인증 필요)
-            const user = await getUser(request, env);
-            if (!user) {
-                return setCORSHeaders(new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 }));
-            }
+            // --- API Routes ---
+            if (pathname.startsWith('/api/')) {
+                let response;
 
-            let response;
-            // Bookmark routes
-            const bookmarkMatch = pathname.match(/^\/api\/bookmarks\/([a-zA-Z0-9-]+)$/);
+                // Handle OPTIONS for CORS preflight
+                if (request.method === 'OPTIONS') {
+                    response = new Response(null, { status: 204 });
+                    return setCORSHeaders(response);
+                }
+                
+                // Auth routes that don't need a user object yet
+                if (pathname === '/api/auth/google') {
+                    response = await handleGoogleAuth(request, env);
+                    return setCORSHeaders(response);
+                }
+                if (pathname === '/api/auth/callback') {
+                    return handleGoogleCallback(request, env);
+                }
+                if (pathname === '/api/auth/status') {
+                    response = await handleAuthStatus(request, env);
+                    return setCORSHeaders(response);
+                }
+                if (pathname === '/api/auth/logout') {
+                    return handleLogout(request, env);
+                }
 
-            if (pathname === '/api/bookmarks' && request.method === 'GET') {
-                response = await handleGetBookmarks(request, env, user);
-            } else if (pathname === '/api/bookmarks' && request.method === 'POST') {
-                response = await handleAddBookmark(request, env, user);
-            } else if (pathname === '/api/bookmarks/bulk' && request.method === 'POST') {
-                response = await handleBulkAddBookmarks(request, env, user);
-            } else if (bookmarkMatch && request.method === 'PUT') {
-                const bookmarkId = bookmarkMatch[1];
-                response = await handleUpdateBookmark(request, env, user, bookmarkId);
-            } else if (bookmarkMatch && request.method === 'DELETE') {
-                const bookmarkId = bookmarkMatch[1];
-                response = await handleDeleteBookmark(request, env, user, bookmarkId);
-            }
+                // --- Authenticated Routes ---
+                const user = await getUser(request, env);
+                if (!user) {
+                    response = new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+                    return setCORSHeaders(response);
+                }
 
-            // 디버그용 라우트 (필요 시 사용)
-            if (pathname === '/api/debug/env' && env.ENVIRONMENT === 'development') {
-                return handleDebugEnv(request, env);
+                const bookmarkMatch = pathname.match(/^\/api\/bookmarks\/([a-zA-Z0-9-]+)$/);
+
+                if (pathname === '/api/bookmarks' && request.method === 'GET') {
+                    response = await handleGetBookmarks(request, env, user);
+                } else if (pathname === '/api/bookmarks' && request.method === 'POST') {
+                    response = await handleAddBookmark(request, env, user);
+                } else if (pathname === '/api/bookmarks/bulk' && request.method === 'POST') {
+                    response = await handleBulkAddBookmarks(request, env, user);
+                } else if (bookmarkMatch && request.method === 'PUT') {
+                    const bookmarkId = bookmarkMatch[1];
+                    response = await handleUpdateBookmark(request, env, user, bookmarkId);
+                } else if (bookmarkMatch && request.method === 'DELETE') {
+                    const bookmarkId = bookmarkMatch[1];
+                    response = await handleDeleteBookmark(request, env, user, bookmarkId);
+                } else {
+                    response = new Response(JSON.stringify({ error: 'API route not found' }), { status: 404 });
+                }
+                
+                return setCORSHeaders(response);
             }
             
-            // API 경로가 아닌 다른 모든 요청은 정적 에셋 핸들러로 전달합니다.
-            // 이를 통해 index.html, script.js 등의 파일이 제공됩니다.
+            // Fallback to static asset handler if not an API route
             return env.ASSETS.fetch(request);
 
         } catch (e) {
