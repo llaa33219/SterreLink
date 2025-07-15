@@ -368,7 +368,7 @@ class SterreLink {
      */
     calculateOrbitalProperties(url) {
         if (!url) {
-            return { rotationSpeed: 0, distanceFromStar: 0 };
+            return { rotationSpeed: 0, distanceFromStar: 0, duration: 300, initialAngle: 0 };
         }
         const hash = this.stringToHash(url);
         
@@ -384,7 +384,7 @@ class SterreLink {
         const rotationSpeed = 1 + (hash % 100) / 50; // Range: 1 to 3
         const distanceFromStar = 150 + (hash % 200); // Range: 150 to 350
         
-        return { rotationSpeed, distanceFromStar };
+        return { rotationSpeed, distanceFromStar, duration, initialAngle };
     }
 
     getFavicon(url) {
@@ -409,6 +409,8 @@ class SterreLink {
         const orbitsContainer = document.getElementById('orbits');
 
         this.bookmarks.forEach((bookmark, index) => {
+            if (!bookmark.url) return; // It's possible for a "bookmark" to be a folder.
+            
             const orbitRadius = this.calculateOrbitRadius(index);
             const { duration, initialAngle } = this.calculateOrbitalProperties(bookmark.url);
 
