@@ -30,8 +30,7 @@ body {
     position: relative;
     width: 1px;
     height: 1px;
-    transition: transform 0.1s ease-out;
-    transform-origin: 0 0;
+    transition: transform 0.5s ease-out;
 }
 
 #star {
@@ -227,20 +226,17 @@ body.zoomed-in .planet-tooltip {
     display: none;
 }
 
-/* Modal styles - ensuring proper display */
+/* Modal styles - mostly unchanged, just ensuring consistency */
 .modal {
     display: none;
     position: fixed;
-    z-index: 9999 !important;
+    z-index: 2000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     overflow: auto;
-    background-color: rgba(0,0,0,0.8);
-    backdrop-filter: blur(5px);
-    opacity: 1;
-    visibility: visible;
+    background-color: rgba(0,0,0,0.6);
 }
 
 .modal-content {

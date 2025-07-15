@@ -13,47 +13,27 @@ class SterreLink {
         this.isDragging = false;
         this.lastMouseX = 0;
         this.lastMouseY = 0;
-        this.viewX = window.innerWidth / 2;
-        this.viewY = window.innerHeight / 2;
+        this.viewX = 0;
+        this.viewY = 0;
         
         this.init();
     }
 
     init() {
-        // DOM이 완전히 로드될 때까지 기다린 후 초기화
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                this.setupEventListeners();
-                this.checkLoginStatus();
-                this.hideLoading();
-            });
-        } else {
-            this.setupEventListeners();
-            this.checkLoginStatus();
-            this.hideLoading();
-        }
+        this.setupEventListeners();
+        this.checkLoginStatus();
+        this.hideLoading();
     }
 
     setupEventListeners() {
         // 항성 클릭 (로그인 또는 북마크 추가)
-        const starElement = document.getElementById('star');
-        if (starElement) {
-            starElement.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Star clicked! Login status:', this.isLoggedIn); // 디버깅용
-                
-                if (!this.isLoggedIn) {
-                    console.log('Attempting Google login...');
-                    this.loginWithGoogle();
-                } else {
-                    console.log('User is logged in, showing modal...');
-                    this.showAddBookmarkModal();
-                }
-            });
-        } else {
-            console.error('Star element not found!');
-        }
+        document.getElementById('star').addEventListener('click', () => {
+            if (!this.isLoggedIn) {
+                this.loginWithGoogle();
+            } else {
+                this.showAddBookmarkModal();
+            }
+        });
 
         // Logout from new dropdown
         document.getElementById('logout-btn').addEventListener('click', () => {
@@ -97,97 +77,76 @@ class SterreLink {
             }
         });
 
-        // Zoom to screen center - 완전히 새로운 방식
+        // Zoom to cursor
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
 
-            const oldZoom = this.zoomLevel;
-            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-            const newZoom = Math.max(0.1, Math.min(5, oldZoom * zoomFactor));
+            const oldZoomLevel = this.zoomLevel;
+            let newZoomLevel;
+
+            if (e.deltaY > 0) {
+                newZoomLevel = Math.max(oldZoomLevel * 0.9, 0.05);
+            } else {
+                newZoomLevel = Math.min(oldZoomLevel * 1.1, 5);
+            }
+
+            if (newZoomLevel === oldZoomLevel) {
+                return; // No change
+            }
             
-            if (newZoom === oldZoom) return;
+            const zoomRatio = newZoomLevel / oldZoomLevel;
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+
+            // To keep the zoom centered on the screen's center, we need to adjust
+            // the view's translation. The logic is to find the vector from the view's
+            // origin to the screen center, scale it by the zoom ratio, and then
+            // set the new view origin based on that scaled vector.
+            this.viewX = centerX - (centerX - this.viewX) * zoomRatio;
+            this.viewY = centerY - (centerY - this.viewY) * zoomRatio;
             
-            // 화면 중앙을 기준으로 확대/축소
-            const screenCenterX = window.innerWidth / 2;
-            const screenCenterY = window.innerHeight / 2;
-            
-            // 현재 뷰의 중심점 계산
-            const worldCenterX = (screenCenterX - this.viewX) / oldZoom;
-            const worldCenterY = (screenCenterY - this.viewY) / oldZoom;
-            
-            // 새로운 줌 레벨에서의 뷰 위치 계산
-            this.viewX = screenCenterX - worldCenterX * newZoom;
-            this.viewY = screenCenterY - worldCenterY * newZoom;
-            this.zoomLevel = newZoom;
+            this.zoomLevel = newZoomLevel;
             
             this.updateView();
         }, { passive: false });
 
         // Panning event listeners
-        let startTime = 0;
-        let startX = 0;
-        let startY = 0;
+        const solarSystem = document.getElementById('solar-system');
         
         document.body.addEventListener('mousedown', (e) => {
-            // Allow clicking on star, links and buttons
-            if (e.target.closest('#star, a, button')) {
+            // Allow clicking on links and buttons
+            if (e.target.closest('a, button')) {
                 return;
             }
-            
-            startTime = Date.now();
-            startX = e.clientX;
-            startY = e.clientY;
+            e.preventDefault();
+            this.isDragging = true;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
+            document.body.style.cursor = 'grabbing';
         });
 
         document.body.addEventListener('mousemove', (e) => {
-            if (startTime === 0) return;
-            
+            if (!this.isDragging) return;
+            e.preventDefault();
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
-            const distance = Math.sqrt(dx*dx + dy*dy);
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
             
-            // Only start dragging if moved more than 5px
-            if (distance > 5) {
-                this.isDragging = true;
-                document.body.style.cursor = 'grabbing';
-            }
+            this.viewX += dx;
+            this.viewY += dy;
             
-            if (this.isDragging) {
-                this.lastMouseX = e.clientX;
-                this.lastMouseY = e.clientY;
-                this.viewX += dx;
-                this.viewY += dy;
-                this.updateView();
-            }
+            this.updateView();
         });
         
-        document.body.addEventListener('mouseup', (e) => {
-            const endTime = Date.now();
-            const endX = e.clientX;
-            const endY = e.clientY;
-            const timeDiff = endTime - startTime;
-            const distance = Math.sqrt((endX - startX)**2 + (endY - startY)**2);
-            
-            // Reset dragging state
+        document.body.addEventListener('mouseup', () => {
             this.isDragging = false;
             document.body.style.cursor = 'default';
-            startTime = 0;
         });
         
         document.body.addEventListener('mouseleave', () => {
             this.isDragging = false;
             document.body.style.cursor = 'default';
-            startTime = 0;
-        });
-
-        // Window resize handling
-        window.addEventListener('resize', () => {
-            // Recenter the view when window is resized
-            this.viewX = window.innerWidth / 2;
-            this.viewY = window.innerHeight / 2;
-            this.updateView();
         });
     }
 
@@ -279,38 +238,13 @@ class SterreLink {
     }
 
     showAddBookmarkModal() {
-        console.log('Showing add bookmark modal...'); // 디버깅용
-        const modal = document.getElementById('add-bookmark-modal');
-        const titleInput = document.getElementById('bookmark-title');
-        
-        if (modal) {
-            modal.style.display = 'block';
-            modal.style.opacity = '1';
-            modal.style.visibility = 'visible';
-            
-            // 약간의 지연을 두고 포커스 설정
-            setTimeout(() => {
-                if (titleInput) {
-                    titleInput.focus();
-                }
-            }, 100);
-            console.log('Modal should now be visible');
-        } else {
-            console.error('Modal element not found!');
-        }
+        document.getElementById('add-bookmark-modal').style.display = 'block';
+        document.getElementById('bookmark-title').focus();
     }
 
     hideAddBookmarkModal() {
-        console.log('Hiding add bookmark modal...'); // 디버깅용
-        const modal = document.getElementById('add-bookmark-modal');
-        const form = document.getElementById('bookmark-form');
-        
-        if (modal) {
-            modal.style.display = 'none';
-        }
-        if (form) {
-            form.reset();
-        }
+        document.getElementById('add-bookmark-modal').style.display = 'none';
+        document.getElementById('bookmark-form').reset();
     }
 
     async addBookmark() {
@@ -495,11 +429,10 @@ class SterreLink {
         const solarSystem = document.getElementById('solar-system');
         const body = document.body;
         
-        // 완전히 새로운 transform 방식
+        // Apply both panning and zooming
         solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
-        solarSystem.style.transformOrigin = '0 0'; // 원점 기준으로 변경
         
-        // Adjust background for a parallax effect
+        // Adjust background for a parallax effect (optional but cool)
         const bgPosX = -this.viewX * 0.1;
         const bgPosY = -this.viewY * 0.1;
         body.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
@@ -603,22 +536,7 @@ if (urlParams.get('auth') === 'success') {
     window.history.replaceState({}, document.title, '/');
 }
 
-// 앱 초기화 - 여러 방법으로 확실하게 초기화
-function initSterreLink() {
-    console.log('Initializing SterreLink...');
-    window.sterreLink = new SterreLink();
-}
-
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initSterreLink);
-} else {
-    initSterreLink();
-}
-
-// 추가 보험으로 윈도우 로드 이벤트도 사용
-window.addEventListener('load', () => {
-    if (!window.sterreLink) {
-        console.log('Backup initialization...');
-        initSterreLink();
-    }
+// 앱 초기화
+document.addEventListener('DOMContentLoaded', () => {
+    new SterreLink();
 }); 
