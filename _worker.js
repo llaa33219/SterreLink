@@ -279,6 +279,50 @@ async function handleGoogleCallback(request, env) {
     }
 }
 
+// 사용자 정보 가져오기 (세션에서)
+async function getUser(request, env) {
+    console.log('Getting user from session...');
+    
+    const cookies = request.headers.get('Cookie');
+    if (!cookies) {
+        console.log('No cookies found');
+        return null;
+    }
+    
+    const tokenMatch = cookies.match(/auth_token=([^;]+)/);
+    if (!tokenMatch) {
+        console.log('No auth token found in cookies');
+        return null;
+    }
+    
+    const sessionId = tokenMatch[1];
+    console.log('Session ID found:', sessionId);
+    
+    try {
+        const sessionData = await env.KV_NAMESPACE.get(`session:${sessionId}`, { type: 'json' });
+        
+        if (!sessionData) {
+            console.log('No session data found');
+            return null;
+        }
+        
+        // 세션 만료 확인
+        if (sessionData.expiresAt < Date.now()) {
+            console.log('Session expired');
+            // 만료된 세션 삭제
+            await env.KV_NAMESPACE.delete(`session:${sessionId}`);
+            return null;
+        }
+        
+        console.log('User session found:', sessionData.email);
+        return sessionData;
+    } catch (error) {
+        console.error('Error getting user session:', error);
+        return null;
+    }
+}
+
+
 /**
  * Checks the user's authentication status based on the session cookie.
  */
