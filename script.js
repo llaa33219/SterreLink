@@ -94,16 +94,17 @@ class SterreLink {
                 return; // No change
             }
             
-            const mouseX = e.clientX;
-            const mouseY = e.clientY;
+            // Zoom to the center of the screen
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
 
-            // The position of the mouse in world coordinates (pre-zoom)
-            const worldMouseX = (mouseX - this.viewX) / oldZoomLevel;
-            const worldMouseY = (mouseY - this.viewY) / oldZoomLevel;
+            // The position of the screen center in world coordinates (pre-zoom)
+            const worldMouseX = (centerX - this.viewX) / oldZoomLevel;
+            const worldMouseY = (centerY - this.viewY) / oldZoomLevel;
             
-            // The new view offset that keeps the world point under the mouse
-            this.viewX = mouseX - worldMouseX * newZoomLevel;
-            this.viewY = mouseY - worldMouseY * newZoomLevel;
+            // The new view offset that keeps the world point under the screen center
+            this.viewX = centerX - worldMouseX * newZoomLevel;
+            this.viewY = centerY - worldMouseY * newZoomLevel;
             
             this.zoomLevel = newZoomLevel;
             
