@@ -94,6 +94,10 @@ class SterreLink {
 
         // Zoom to cursor
         document.addEventListener('wheel', (e) => {
+            // 모달이 열려있을 때는 줌 기능을 막고 모달 내부의 스크롤은 허용합니다.
+            if (e.target.closest('.modal')) {
+                return;
+            }
             e.preventDefault();
 
             const oldZoomLevel = this.zoomLevel;
@@ -129,8 +133,8 @@ class SterreLink {
         const solarSystem = document.getElementById('solar-system');
         
         document.body.addEventListener('mousedown', (e) => {
-            // Allow clicking on links, buttons, or the star itself
-            if (e.target.closest('a, button, #star')) {
+            // 모달, 링크, 버튼, 항성 자체를 클릭했을 때는 패닝을 시작하지 않습니다.
+            if (e.target.closest('.modal, a, button, #star')) {
                 return;
             }
             e.preventDefault();
