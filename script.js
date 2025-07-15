@@ -434,9 +434,9 @@ class SterreLink {
 
     updateView() {
         const solarSystem = document.getElementById('solar-system');
-        const body = document.body;
         
-        // Apply both panning and zooming
+        solarSystem.style.transition = 'none';
+
         solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
         
         // Adjust background for a parallax effect (optional but cool)
