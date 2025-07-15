@@ -281,7 +281,10 @@ class SterreLink {
         const bookmarksToRender = filteredBookmarks || this.bookmarks;
 
         bookmarksToRender.forEach(bookmark => {
-            const { rotationSpeed, distanceFromStar } = this.calculateOrbitalProperties(bookmark.url);
+            // It's possible for a "bookmark" to be a folder, which has no URL.
+            if (!bookmark.url) return;
+
+            const orbitalProperties = this.calculateOrbitalProperties(bookmark.url);
             
             const card = document.createElement('a');
             card.href = bookmark.url;
@@ -292,8 +295,8 @@ class SterreLink {
                 <div class="bookmark-card-title">${bookmark.title}</div>
                 <div class="bookmark-card-url">${bookmark.url}</div>
                 <div class="bookmark-card-info">
-                    <span>자전 속도: ${rotationSpeed.toFixed(2)}</span> | 
-                    <span>항성 거리: ${distanceFromStar.toFixed(0)}</span>
+                    <span>자전 속도: ${orbitalProperties.rotationSpeed.toFixed(2)}</span> | 
+                    <span>항성 거리: ${orbitalProperties.distanceFromStar.toFixed(0)}</span>
                 </div>
             `;
             grid.appendChild(card);
@@ -364,6 +367,9 @@ class SterreLink {
      * based on the bookmark's URL.
      */
     calculateOrbitalProperties(url) {
+        if (!url) {
+            return { rotationSpeed: 0, distanceFromStar: 0 };
+        }
         const hash = this.stringToHash(url);
         
         // Duration between 300s (5min) and 1800s (30min) for a visible but slow orbit.
@@ -374,11 +380,17 @@ class SterreLink {
         // Initial angle between 0 and 360 degrees
         const initialAngle = hash % 360;
 
-        return { duration, initialAngle };
+        // Use the hash to generate deterministic but varied properties
+        const rotationSpeed = 1 + (hash % 100) / 50; // Range: 1 to 3
+        const distanceFromStar = 150 + (hash % 200); // Range: 150 to 350
+        
+        return { rotationSpeed, distanceFromStar };
     }
 
-
     getFavicon(url) {
+        if (!url) {
+            return ''; // Should not happen due to the check in renderBookmarkGrid
+        }
         try {
             const domain = new URL(url).hostname;
             return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
