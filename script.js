@@ -18,42 +18,34 @@ class SterreLink {
     }
 
     setupEventListeners() {
-        // 항성 클릭 -> 북마크 추가 모달 열기
+        // 항성 클릭 (로그인 또는 북마크 추가)
         document.getElementById('star').addEventListener('click', () => {
-            if (this.isLoggedIn) {
-                this.showAddBookmarkModal();
-            } else {
-                // 로그인하지 않은 경우, 로그인 페이지로 안내하거나
-                // 간단한 알림을 표시할 수 있습니다. 여기서는 로그인 함수를 호출합니다.
+            if (!this.isLoggedIn) {
                 this.loginWithGoogle();
+            } else {
+                this.showAddBookmarkModal();
             }
         });
 
-        // 사용자 프로필 메뉴 이벤트
-        const userProfile = document.getElementById('user-profile');
-        userProfile.addEventListener('click', (e) => {
-            // 메뉴 자체를 클릭한게 아니면 (자식요소 제외) 메뉴를 토글
-            if (e.target === userProfile || e.target === document.getElementById('user-avatar')) {
-                e.currentTarget.classList.toggle('active');
-            }
-        });
-        
-        // 드롭다운 메뉴 항목 이벤트
-        document.getElementById('logout-btn').addEventListener('click', (e) => {
-            e.preventDefault();
+        // Logout from new dropdown
+        document.getElementById('logout-btn').addEventListener('click', () => {
             this.logout();
         });
-
-        document.getElementById('import-bookmarks-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            document.getElementById('import-bookmarks-input').click();
+        
+        // Import bookmarks
+        document.getElementById('import-bookmarks-btn').addEventListener('click', () => {
+            this.showImportBookmarksModal();
         });
 
-        document.getElementById('import-bookmarks-input').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this.importBookmarks(file);
-            }
+        // Modal-related for import
+        document.querySelector('.close-import').addEventListener('click', () => {
+            this.hideImportBookmarksModal();
+        });
+        document.getElementById('cancel-import-bookmark').addEventListener('click', () => {
+            this.hideImportBookmarksModal();
+        });
+        document.getElementById('start-import-btn').addEventListener('click', () => {
+            this.handleBookmarkFile();
         });
 
         // 모달 관련
@@ -77,7 +69,7 @@ class SterreLink {
             }
         });
 
-        // 마우스 휠 줌 (기존 로직 유지)
+        // 마우스 휠 줌
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (e.deltaY > 0) {
@@ -105,16 +97,12 @@ class SterreLink {
             if (data.isLoggedIn) {
                 this.isLoggedIn = true;
                 this.userEmail = data.email;
-                this.updateUIForLogin(data);
+                this.userPicture = data.picture; // Store user picture
+                this.updateUIForLogin();
                 await this.loadBookmarks();
-            } else {
-                this.isLoggedIn = false;
-                this.userEmail = null;
-                this.updateUIForLogout();
             }
         } catch (error) {
             console.error('Login status check failed:', error);
-            this.updateUIForLogout();
         }
     }
 
@@ -144,21 +132,31 @@ class SterreLink {
         }
     }
 
-    updateUIForLogin(userData) {
-        const userProfile = document.getElementById('user-profile');
-        const userAvatar = document.getElementById('user-avatar');
+    updateUIForLogin() {
+        const starContent = document.getElementById('star');
+        starContent.classList.add('logged-in');
         
-        userAvatar.src = userData.picture || 'https://lh3.googleusercontent.com/a/default-user=s96-c';
-        userProfile.classList.remove('hidden');
+        // Update new user profile widget
+        const profileWidget = document.getElementById('user-profile-widget');
+        const profilePic = document.getElementById('user-profile-pic');
+        
+        profileWidget.style.display = 'block';
+        profilePic.src = this.userPicture || 'https://lh3.googleusercontent.com/a/default-user=s96-c';
+        
+        // Hide old logout button if it exists
+        const oldLogoutButton = document.getElementById('logout');
+        if(oldLogoutButton) oldLogoutButton.style.display = 'none';
     }
 
     updateUIForLogout() {
-        document.getElementById('user-profile').classList.add('hidden');
-        document.getElementById('user-profile').classList.remove('active'); // 메뉴 닫기
+        const starContent = document.getElementById('star');
+        starContent.classList.remove('logged-in');
+
+        // Hide user profile widget
+        document.getElementById('user-profile-widget').style.display = 'none';
     }
 
     async loadBookmarks() {
-        if (!this.isLoggedIn) return; // 로그인 상태가 아닐 경우 북마크 로드 방지
         try {
             const response = await fetch('/api/bookmarks');
             const data = await response.json();
@@ -170,61 +168,6 @@ class SterreLink {
         }
     }
 
-    async importBookmarks(file) {
-        this.showLoading();
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const htmlContent = event.target.result;
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlContent, "text/html");
-                const links = Array.from(doc.querySelectorAll('a'));
-                
-                if (links.length === 0) {
-                    alert('북마크 파일에서 유효한 링크를 찾을 수 없습니다.');
-                    this.hideLoading();
-                    return;
-                }
-
-                const newBookmarks = links.map(link => ({
-                    title: link.textContent.trim() || '제목 없음',
-                    url: link.href
-                })).filter(b => b.url.startsWith('http')); // 유효한 URL만 필터링
-
-                if (newBookmarks.length === 0) {
-                    alert('추가할 수 있는 유효한 북마크가 없습니다.');
-                    this.hideLoading();
-                    return;
-                }
-                
-                const response = await fetch('/api/bookmarks/import', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ bookmarks: newBookmarks })
-                });
-
-                if (!response.ok) {
-                    throw new Error('서버와 통신 중 오류가 발생했습니다.');
-                }
-                
-                const result = await response.json();
-                alert(`${result.importedCount}개의 새로운 북마크를 성공적으로 가져왔습니다!`);
-                
-                // 새로운 북마크를 반영하기 위해 페이지를 새로고침합니다.
-                window.location.reload();
-
-            } catch (error) {
-                console.error('Failed to import bookmarks:', error);
-                alert('북마크를 가져오는 중 오류가 발생했습니다.');
-            } finally {
-                // 입력 필드 초기화
-                document.getElementById('import-bookmarks-input').value = '';
-                this.hideLoading();
-            }
-        };
-        reader.readAsText(file, 'UTF-8');
-    }
-    
     showAddBookmarkModal() {
         document.getElementById('add-bookmark-modal').style.display = 'block';
         document.getElementById('bookmark-title').focus();
@@ -277,31 +220,13 @@ class SterreLink {
     }
 
     calculateOrbitRadius(index, total) {
-        // 북마크 개수에 따라 동적으로 확장되는 맵 로직
-        const baseRadius = 120; // 가장 안쪽 궤도 반지름
-        const layerMultiplier = 1.8; // 각 층의 북마크가 이전 층의 몇 배가 될지 결정
-        
-        let layer = 0;
-        let maxPlanetsInLayer = 6;
-        let cumulativePlanets = 0;
-        let indexInLayer = 0;
-
-        while (true) {
-            cumulativePlanets += maxPlanetsInLayer;
-            if (index < cumulativePlanets) {
-                indexInLayer = index - (cumulativePlanets - maxPlanetsInLayer);
-                break;
-            }
-            maxPlanetsInLayer = Math.floor(maxPlanetsInLayer * layerMultiplier);
-            layer++;
+        const baseRadius = 120; // Closest orbit radius
+        const growthFactor = 1.1; // How much each orbit grows compared to the previous one
+        let radius = baseRadius;
+        for (let i = 0; i < index; i++) {
+            radius = baseRadius + (radius - baseRadius) * growthFactor;
         }
-        
-        const layerRadius = baseRadius + (layer * 100); // 각 층 사이의 간격
-
-        // 같은 궤도 내에서 행성을 배치하기 위한 추가 로직
-        // 이 예제에서는 모든 행성을 해당 층의 동일한 반지름에 위치시킵니다.
-        // 더 복잡한 로직을 원한다면 여기를 수정할 수 있습니다.
-        return layerRadius;
+        return radius;
     }
 
     calculateOrbitSpeed(title, url) {
@@ -424,8 +349,87 @@ class SterreLink {
     }
 
     updateZoom() {
-        const universe = document.getElementById('universe');
-        universe.style.transform = `scale(${this.zoomLevel})`;
+        const solarSystem = document.getElementById('solar-system');
+        const body = document.body;
+        solarSystem.style.transform = `scale(${this.zoomLevel})`;
+        body.style.backgroundSize = `${400 / this.zoomLevel}% ${400 / this.zoomLevel}%`;
+    }
+
+    showImportBookmarksModal() {
+        document.getElementById('import-bookmarks-modal').style.display = 'block';
+    }
+
+    hideImportBookmarksModal() {
+        document.getElementById('import-bookmarks-modal').style.display = 'none';
+        document.getElementById('bookmark-file-input').value = '';
+        document.getElementById('import-status').textContent = '';
+    }
+
+    handleBookmarkFile() {
+        const fileInput = document.getElementById('bookmark-file-input');
+        const statusEl = document.getElementById('import-status');
+        
+        if (!fileInput.files.length) {
+            statusEl.textContent = 'Please select a file first.';
+            return;
+        }
+
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = async (event) => {
+            try {
+                const htmlContent = event.target.result;
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlContent, 'text/html');
+                const links = Array.from(doc.querySelectorAll('a'));
+                
+                const bookmarksToImport = links.map(link => ({
+                    title: link.textContent.trim(),
+                    url: link.href
+                })).filter(b => b.url && (b.url.startsWith('http://') || b.url.startsWith('https://')));
+
+                if (bookmarksToImport.length === 0) {
+                    statusEl.textContent = 'No valid bookmarks found in the file.';
+                    return;
+                }
+
+                statusEl.textContent = `Found ${bookmarksToImport.length} bookmarks. Importing...`;
+                await this.importBookmarks(bookmarksToImport);
+
+            } catch (error) {
+                console.error('Error parsing bookmark file:', error);
+                statusEl.textContent = 'Error parsing file. Make sure it is a valid HTML file.';
+            }
+        };
+        
+        reader.onerror = () => {
+            statusEl.textContent = 'Failed to read the file.';
+        };
+
+        reader.readAsText(file);
+    }
+
+    async importBookmarks(bookmarks) {
+        try {
+            const response = await fetch('/api/bookmarks/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookmarks })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                alert(`${result.added} bookmarks have been successfully imported! The page will now reload.`);
+                window.location.reload();
+            } else {
+                const errorData = await response.json();
+                document.getElementById('import-status').textContent = `Import failed: ${errorData.error}`;
+            }
+        } catch (error) {
+            console.error('Failed to import bookmarks:', error);
+            document.getElementById('import-status').textContent = 'An unexpected error occurred during import.';
+        }
     }
 }
 

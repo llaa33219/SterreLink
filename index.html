@@ -10,59 +10,65 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- 사용자 프로필 -->
-    <div id="user-profile" class="hidden">
-        <img id="user-avatar" src="" alt="User Avatar">
-        <div id="user-menu" class="dropdown-content">
-            <a href="#" id="import-bookmarks-btn">북마크 가져오기</a>
-            <input type="file" id="import-bookmarks-input" accept=".html" style="display: none;">
-            <a href="#" id="logout-btn">로그아웃</a>
+    <div id="loading">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="user-profile-widget" style="display: none;">
+        <img id="user-profile-pic" src="" alt="User Profile">
+        <div id="user-dropdown" class="dropdown-content">
+            <a id="import-bookmarks-btn">Import Bookmarks</a>
+            <a id="logout-btn">Logout</a>
         </div>
     </div>
 
-    <div id="universe">
-        <div id="starfield"></div>
-        
-        <!-- 항성 (북마크 추가 버튼) -->
-        <div id="star" class="star">
+    <div id="solar-system">
+        <div id="star">
             <div id="star-content">
-                <span id="star-add-icon">+</span>
+                <img id="star-icon" src="https://developers.google.com/identity/images/g-logo.png" alt="Star">
                 <div id="star-glow"></div>
             </div>
         </div>
-        
-        <!-- 궤도들 -->
         <div id="orbits"></div>
-        
-        <!-- 행성들 (북마크) -->
         <div id="planets"></div>
-        
-        <!-- 북마크 추가 모달 -->
-        <div id="add-bookmark-modal" class="modal">
-            <div class="modal-content">
-                <span class="close">&times;</span>
-                <h2>새 북마크 추가</h2>
-                <form id="bookmark-form">
-                    <div class="form-group">
-                        <label for="bookmark-title">제목:</label>
-                        <input type="text" id="bookmark-title" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="bookmark-url">URL:</label>
-                        <input type="url" id="bookmark-url" required>
-                    </div>
-                    <div class="form-buttons">
-                        <button type="submit">추가</button>
-                        <button type="button" id="cancel-bookmark">취소</button>
-                    </div>
-                </form>
-            </div>
+    </div>
+
+    <div id="controls">
+        <button id="logout" style="display: none;">Logout</button>
+    </div>
+
+    <div id="add-bookmark-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>새 북마크 추가</h2>
+            <form id="bookmark-form">
+                <div class="form-group">
+                    <label for="bookmark-title">제목:</label>
+                    <input type="text" id="bookmark-title" required>
+                </div>
+                <div class="form-group">
+                    <label for="bookmark-url">URL:</label>
+                    <input type="url" id="bookmark-url" required>
+                </div>
+                <div class="form-buttons">
+                    <button type="submit">추가</button>
+                    <button type="button" id="cancel-bookmark">취소</button>
+                </div>
+            </form>
         </div>
-        
-        <!-- 로딩 스피너 -->
-        <div id="loading" class="loading">
-            <div class="spinner"></div>
-            <p>우주를 탐험하는 중...</p>
+    </div>
+
+    <div id="import-bookmarks-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-import">&times;</span>
+            <h2>Import Bookmarks</h2>
+            <p>Select an HTML file exported from your browser.</p>
+            <input type="file" id="bookmark-file-input" accept=".html">
+            <div id="import-status"></div>
+            <div class="form-buttons">
+                <button id="start-import-btn">Import</button>
+                <button type="button" id="cancel-import-bookmark">Cancel</button>
+            </div>
         </div>
     </div>
 
