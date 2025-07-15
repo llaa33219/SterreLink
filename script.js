@@ -2,11 +2,19 @@ class SterreLink {
     constructor() {
         this.isLoggedIn = false;
         this.userEmail = null;
+        this.userPicture = null;
         this.bookmarks = [];
         this.zoomLevel = 1;
         this.planetElements = [];
         this.orbitElements = [];
         this.animationId = null;
+
+        // Panning state
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        this.viewX = 0;
+        this.viewY = 0;
         
         this.init();
     }
@@ -73,12 +81,51 @@ class SterreLink {
         document.addEventListener('wheel', (e) => {
             e.preventDefault();
             if (e.deltaY > 0) {
-                this.zoomLevel = Math.max(this.zoomLevel * 0.9, 0.3);
+                this.zoomLevel = Math.max(this.zoomLevel * 0.9, 0.05); // Allow more zoom-out
             } else {
-                this.zoomLevel = Math.min(this.zoomLevel * 1.1, 3);
+                this.zoomLevel = Math.min(this.zoomLevel * 1.1, 5); // Allow more zoom-in
             }
             this.updateZoom();
         }, { passive: false }); // Explicitly set passive to false to prevent console warnings
+
+        // Panning event listeners
+        const solarSystem = document.getElementById('solar-system');
+        
+        document.body.addEventListener('mousedown', (e) => {
+            // Allow clicking on links and buttons
+            if (e.target.closest('a, button')) {
+                return;
+            }
+            e.preventDefault();
+            this.isDragging = true;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            document.body.style.cursor = 'grabbing';
+        });
+
+        document.body.addEventListener('mousemove', (e) => {
+            if (!this.isDragging) return;
+            e.preventDefault();
+            const dx = e.clientX - this.lastMouseX;
+            const dy = e.clientY - this.lastMouseY;
+            this.lastMouseX = e.clientX;
+            this.lastMouseY = e.clientY;
+            
+            this.viewX += dx;
+            this.viewY += dy;
+            
+            this.updateView();
+        });
+        
+        document.body.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            document.body.style.cursor = 'default';
+        });
+        
+        document.body.addEventListener('mouseleave', () => {
+            this.isDragging = false;
+            document.body.style.cursor = 'default';
+        });
     }
 
     showLoading() {
@@ -353,10 +400,28 @@ class SterreLink {
     }
 
     updateZoom() {
+        this.updateView(); // Zooming now just calls the main view update function
+    }
+
+    updateView() {
         const solarSystem = document.getElementById('solar-system');
         const body = document.body;
-        solarSystem.style.transform = `scale(${this.zoomLevel})`;
+        
+        // Apply both panning and zooming
+        solarSystem.style.transform = `translate(${this.viewX}px, ${this.viewY}px) scale(${this.zoomLevel})`;
+        
+        // Adjust background for a parallax effect (optional but cool)
+        const bgPosX = -this.viewX * 0.1;
+        const bgPosY = -this.viewY * 0.1;
+        body.style.backgroundPosition = `${bgPosX}px ${bgPosY}px`;
         body.style.backgroundSize = `${400 / this.zoomLevel}% ${400 / this.zoomLevel}%`;
+
+        // Add/remove class for showing tooltips when zoomed in
+        if (this.zoomLevel > 1.5) {
+            body.classList.add('zoomed-in');
+        } else {
+            body.classList.remove('zoomed-in');
+        }
     }
 
     showImportBookmarksModal() {
