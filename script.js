@@ -20,12 +20,6 @@ class SterreLink {
         this.contextMenuVisible = false;
         this.contextMenuTargetId = null;
 
-        // Focus state
-        this.focusedPlanetId = null;
-        this.originalViewX = 0;
-        this.originalViewY = 0;
-        this.originalZoomLevel = 1;
-
         this.init();
     }
 
@@ -95,6 +89,10 @@ class SterreLink {
             this.filterBookmarks(e.target.value);
         });
 
+        document.getElementById('delete-all-btn').addEventListener('click', () => {
+            this.deleteAllBookmarks();
+        });
+
         // 모달 바깥 클릭시 닫기
         document.getElementById('add-bookmark-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
@@ -108,12 +106,6 @@ class SterreLink {
             if (e.target.closest('.modal')) {
                 return;
             }
-            
-            // 포커스 모드일 때는 줌 비활성화
-            if (this.focusedPlanetId) {
-                return;
-            }
-            
             e.preventDefault();
 
             const oldZoomLevel = this.zoomLevel;
@@ -153,13 +145,6 @@ class SterreLink {
             if (e.target.closest('.modal, a, button, #star, .context-menu')) {
                 return;
             }
-            
-            // 포커스 모드일 때는 클릭으로 포커스 해제
-            if (this.focusedPlanetId) {
-                this.unfocusPlanet();
-                return;
-            }
-            
             e.preventDefault();
             this.isDragging = true;
             this.lastMouseX = e.clientX;
@@ -169,10 +154,6 @@ class SterreLink {
 
         document.body.addEventListener('mousemove', (e) => {
             if (!this.isDragging) return;
-            
-            // 포커스 모드일 때는 패닝 비활성화
-            if (this.focusedPlanetId) return;
-            
             e.preventDefault();
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
@@ -333,22 +314,18 @@ class SterreLink {
         grid.innerHTML = '';
         const bookmarksToRender = filteredBookmarks || this.bookmarks;
 
-        bookmarksToRender.forEach((bookmark, index) => {
+        bookmarksToRender.forEach(bookmark => {
             // It's possible for a "bookmark" to be a folder, which has no URL.
             if (!bookmark.url) return;
 
             const orbitalProperties = this.calculateOrbitalProperties(bookmark.url);
-            const orbitRadius = this.calculateOrbitRadius(index);
             
             const card = document.createElement('div'); // Use div instead of <a>
             card.className = 'bookmark-card';
             card.dataset.id = bookmark.id; // Store bookmark ID
             
-            card.addEventListener('click', (e) => {
-                // Only open URL if not clicking on focus button
-                if (!e.target.closest('.focus-button')) {
-                    window.open(bookmark.url, '_blank');
-                }
+            card.addEventListener('click', () => {
+                window.open(bookmark.url, '_blank');
             });
 
             // Only add context menu listener if the bookmark has an ID
@@ -367,29 +344,7 @@ class SterreLink {
                     <span>자전 속도: ${orbitalProperties.rotationSpeed.toFixed(2)}</span> | 
                     <span>항성 거리: ${orbitalProperties.distanceFromStar.toFixed(0)}</span>
                 </div>
-                <button class="focus-button" data-bookmark-id="${bookmark.id}" data-orbit-radius="${orbitRadius}">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="M21 21l-4.35-4.35"></path>
-                    </svg>
-                    포커스
-                </button>
             `;
-
-            // Add focus button event listener
-            const focusButton = card.querySelector('.focus-button');
-            focusButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const bookmarkId = e.target.closest('.focus-button').dataset.bookmarkId;
-                const orbitRadius = parseFloat(e.target.closest('.focus-button').dataset.orbitRadius);
-                
-                // Close the modal and focus on the planet
-                this.hideBookmarkListModal();
-                setTimeout(() => {
-                    this.focusPlanet(bookmarkId, orbitRadius);
-                }, 100);
-            });
-
             grid.appendChild(card);
         });
     }
@@ -463,21 +418,44 @@ class SterreLink {
     }
 
     async deleteBookmark(id) {
-        if (!confirm('정말로 이 북마크를 삭제하시겠습니까?')) {
-            return;
-        }
-
-        try {
-            const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
-            if (response.ok) {
-                this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-                this.renderPlanets();
-                this.renderBookmarkGrid();
-            } else {
-                console.error('Failed to delete bookmark');
+        if (confirm('정말로 이 북마크를 삭제하시겠습니까?')) {
+            try {
+                const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    this.bookmarks = this.bookmarks.filter(b => b.id !== id);
+                    this.renderPlanets();
+                    this.renderBookmarkGrid();
+                } else {
+                    alert('북마크 삭제에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('Error deleting bookmark:', error);
+                alert('북마크 삭제 중 오류가 발생했습니다.');
             }
-        } catch (error) {
-            console.error('Error deleting bookmark:', error);
+        }
+    }
+
+    async deleteAllBookmarks() {
+        if (confirm('정말로 모든 북마크를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+            if (confirm('두 번째 확인입니다. 정말로 모든 데이터를 삭제하시겠습니까?')) {
+                if (confirm('마지막 확인입니다. 모든 북마크가 영구적으로 삭제됩니다. 계속하시겠습니까?')) {
+                    try {
+                        const response = await fetch('/api/bookmarks/all', { method: 'DELETE' });
+                        if (response.ok) {
+                            this.bookmarks = [];
+                            this.renderPlanets();
+                            this.renderBookmarkGrid();
+                            this.hideBookmarkListModal();
+                            alert('모든 북마크가 삭제되었습니다.');
+                        } else {
+                            alert('전체 삭제에 실패했습니다.');
+                        }
+                    } catch (error) {
+                        console.error('Error deleting all bookmarks:', error);
+                        alert('전체 삭제 중 오류가 발생했습니다.');
+                    }
+                }
+            }
         }
     }
 
@@ -614,20 +592,12 @@ class SterreLink {
             planet.href = bookmark.url;
             planet.target = '_blank';
             planet.style.backgroundImage = `url(${this.getFavicon(bookmark.url)})`;
-            planet.dataset.bookmarkId = bookmark.id; // Store bookmark ID for focus functionality
             
             // Tooltip for the planet name
             const tooltip = document.createElement('div');
             tooltip.className = 'planet-tooltip';
             tooltip.textContent = bookmark.title;
             planet.appendChild(tooltip);
-
-            // Add right-click event for focus
-            planet.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                this.focusPlanet(bookmark.id, orbitRadius);
-            });
 
             // Add planet to its rotation container
             rotationContainer.appendChild(planet);
@@ -771,65 +741,6 @@ class SterreLink {
             console.error('Failed to import bookmarks:', error);
             document.getElementById('import-status').textContent = 'An unexpected error occurred during import.';
         }
-    }
-
-    focusPlanet(bookmarkId, orbitRadius) {
-        // 이미 포커스된 상태면 무시
-        if (this.focusedPlanetId === bookmarkId) {
-            return;
-        }
-
-        // 현재 뷰 상태 저장
-        this.originalViewX = this.viewX;
-        this.originalViewY = this.viewY;
-        this.originalZoomLevel = this.zoomLevel;
-
-        // 포커스된 행성 ID 설정
-        this.focusedPlanetId = bookmarkId;
-
-        // 화면 중앙으로 이동
-        this.viewX = window.innerWidth / 2;
-        this.viewY = window.innerHeight / 2;
-
-        // 적절한 확대 배율 계산 (궤도 반지름에 따라 조정)
-        const targetZoom = Math.min(Math.max(300 / orbitRadius, 0.8), 3);
-        this.zoomLevel = targetZoom;
-
-        // 부드러운 애니메이션을 위해 transition 적용
-        const solarSystem = document.getElementById('solar-system');
-        solarSystem.style.transition = 'transform 0.8s ease-out';
-        
-        this.updateView();
-
-        // 애니메이션 완료 후 transition 제거
-        setTimeout(() => {
-            solarSystem.style.transition = 'none';
-        }, 800);
-    }
-
-    unfocusPlanet() {
-        if (!this.focusedPlanetId) {
-            return;
-        }
-
-        // 원래 뷰 상태로 복원
-        this.viewX = this.originalViewX;
-        this.viewY = this.originalViewY;
-        this.zoomLevel = this.originalZoomLevel;
-
-        // 포커스 해제
-        this.focusedPlanetId = null;
-
-        // 부드러운 애니메이션을 위해 transition 적용
-        const solarSystem = document.getElementById('solar-system');
-        solarSystem.style.transition = 'transform 0.8s ease-out';
-        
-        this.updateView();
-
-        // 애니메이션 완료 후 transition 제거
-        setTimeout(() => {
-            solarSystem.style.transition = 'none';
-        }, 800);
     }
 }
 
