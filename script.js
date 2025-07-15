@@ -40,6 +40,21 @@ class SterreLink {
             this.logout();
         });
         
+        // List View button
+        document.getElementById('list-view-btn').addEventListener('click', () => {
+            this.showListViewModal();
+        });
+
+        // Close List View modal
+        document.querySelector('.close-list-view').addEventListener('click', () => {
+            this.hideListViewModal();
+        });
+
+        // Search in List View
+        document.getElementById('list-search-input').addEventListener('input', (e) => {
+            this.filterBookmarkCards(e.target.value);
+        });
+
         // Import bookmarks
         document.getElementById('import-bookmarks-btn').addEventListener('click', () => {
             this.showImportBookmarksModal();
@@ -446,20 +461,66 @@ class SterreLink {
 
     hideImportBookmarksModal() {
         document.getElementById('import-bookmarks-modal').style.display = 'none';
-        document.getElementById('bookmark-file-input').value = '';
-        document.getElementById('import-status').textContent = '';
+        document.getElementById('import-file-input').value = '';
     }
 
-    handleBookmarkFile() {
-        const fileInput = document.getElementById('bookmark-file-input');
-        const statusEl = document.getElementById('import-status');
+    showListViewModal() {
+        this.renderBookmarkCards();
+        document.getElementById('list-view-modal').style.display = 'block';
+    }
+
+    hideListViewModal() {
+        document.getElementById('list-view-modal').style.display = 'none';
+        document.getElementById('list-search-input').value = '';
+    }
+
+    renderBookmarkCards(filter = '') {
+        const container = document.getElementById('list-view-container');
+        container.innerHTML = '';
+
+        const lowerCaseFilter = filter.toLowerCase();
+
+        const filteredBookmarks = this.bookmarks.filter(b => {
+            return b.title.toLowerCase().includes(lowerCaseFilter) || b.url.toLowerCase().includes(lowerCaseFilter);
+        });
         
-        if (!fileInput.files.length) {
+        if (filteredBookmarks.length === 0) {
+            container.innerHTML = '<p>No matching bookmarks found.</p>';
+            return;
+        }
+
+        filteredBookmarks.forEach(bookmark => {
+            const card = document.createElement('div');
+            card.className = 'bookmark-card';
+            card.addEventListener('click', () => {
+                window.open(bookmark.url, '_blank');
+            });
+            
+            const orbitalProps = this.calculateOrbitalProperties(bookmark.url);
+
+            card.innerHTML = `
+                <img src="${this.getFavicon(bookmark.url)}" alt="${bookmark.title} Favicon">
+                <h3>${bookmark.title}</h3>
+                <p>${bookmark.url}</p>
+                <p>Orbit Radius: ${orbitalProps.radius.toFixed(2)}</p>
+                <p>Orbit Speed: ${orbitalProps.speed.toFixed(2)}</p>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    filterBookmarkCards(filter) {
+        this.renderBookmarkCards(filter);
+    }
+
+    async handleBookmarkFile() {
+        const input = document.getElementById('import-file-input');
+        if (!input.files || input.files.length === 0) {
             statusEl.textContent = 'Please select a file first.';
             return;
         }
 
-        const file = fileInput.files[0];
+        const file = input.files[0];
         const reader = new FileReader();
 
         reader.onload = async (event) => {

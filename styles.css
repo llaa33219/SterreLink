@@ -410,3 +410,65 @@ body.zoomed-in .planet-tooltip {
         margin: 20px;
     }
 } 
+
+/* Styles for the new List View Modal */
+#list-view-modal .modal-content {
+    max-width: 90%;
+    width: 1200px;
+}
+
+#list-search-input {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* To include padding in the width */
+}
+
+#list-view-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 10px; /* For scrollbar spacing */
+}
+
+.bookmark-card {
+    background-color: #333;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden; /* To keep content within rounded corners */
+}
+
+.bookmark-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.bookmark-card img {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 10px;
+}
+
+.bookmark-card h3 {
+    margin: 10px 0;
+    font-size: 1.1em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bookmark-card p {
+    margin: 5px 0;
+    font-size: 0.9em;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+} 

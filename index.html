@@ -18,6 +18,7 @@
         <img id="user-profile-pic" src="" alt="User Profile">
         <div id="user-dropdown" class="dropdown-content">
             <a id="import-bookmarks-btn">Import Bookmarks</a>
+            <a id="list-view-btn">List View</a>
             <a id="logout-btn">Logout</a>
         </div>
     </div>
@@ -68,6 +69,18 @@
             <div class="form-buttons">
                 <button id="start-import-btn">Import</button>
                 <button type="button" id="cancel-import-bookmark">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- The Modal for List View -->
+    <div id="list-view-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-list-view">&times;</span>
+            <h2>Bookmark List</h2>
+            <input type="text" id="list-search-input" placeholder="Search by title or URL...">
+            <div id="list-view-container">
+                <!-- Bookmark cards will be inserted here by JavaScript -->
             </div>
         </div>
     </div>
