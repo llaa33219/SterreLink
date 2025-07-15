@@ -318,7 +318,7 @@ class SterreLink {
             
             const card = document.createElement('div'); // Use div instead of <a>
             card.className = 'bookmark-card';
-            card.dataset.id = bookmark._id; // Store bookmark ID
+            card.dataset.id = bookmark.id; // Store bookmark ID
             
             card.addEventListener('click', () => {
                 window.open(bookmark.url, '_blank');
@@ -326,7 +326,7 @@ class SterreLink {
 
             card.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
-                this.showContextMenu(e.pageX, e.pageY, bookmark._id);
+                this.showContextMenu(e.pageX, e.pageY, bookmark.id);
             });
 
             card.innerHTML = `
@@ -395,7 +395,7 @@ class SterreLink {
 
             if (response.ok) {
                 const updatedBookmark = await response.json();
-                const index = this.bookmarks.findIndex(b => b._id === id);
+                const index = this.bookmarks.findIndex(b => b.id === id);
                 if (index !== -1) {
                     this.bookmarks[index] = updatedBookmark.bookmark;
                 }
@@ -418,7 +418,7 @@ class SterreLink {
         try {
             const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
             if (response.ok) {
-                this.bookmarks = this.bookmarks.filter(b => b._id !== id);
+                this.bookmarks = this.bookmarks.filter(b => b.id !== id);
                 this.renderPlanets();
                 this.renderBookmarkGrid();
             } else {
@@ -446,7 +446,7 @@ class SterreLink {
     }
 
     showEditBookmarkModal(id) {
-        const bookmark = this.bookmarks.find(b => b._id === id);
+        const bookmark = this.bookmarks.find(b => b.id === id);
         if (bookmark) {
             const form = document.getElementById('bookmark-form');
             document.querySelector('#add-bookmark-modal h2').textContent = '북마크 수정';
