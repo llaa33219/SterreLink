@@ -16,12 +16,15 @@ class SterreLink {
         this.viewX = 0;
         this.viewY = 0;
         
-        // Focus state
-        this.focusedPlanetId = null;
-
         // Context menu state
         this.contextMenuVisible = false;
         this.contextMenuTargetId = null;
+
+        // Focus state
+        this.focusedPlanetId = null;
+        this.originalViewX = 0;
+        this.originalViewY = 0;
+        this.originalZoomLevel = 1;
 
         this.init();
     }
@@ -55,15 +58,6 @@ class SterreLink {
         // List view button
         document.getElementById('list-view-btn').addEventListener('click', () => {
             this.showBookmarkListModal();
-        });
-
-        // Add event listener for dynamically created focus buttons in the grid
-        document.getElementById('bookmark-grid').addEventListener('click', (e) => {
-            if (e.target.classList.contains('focus-btn')) {
-                const bookmarkId = e.target.dataset.id;
-                this.focusOnPlanet(bookmarkId);
-                this.hideBookmarkListModal();
-            }
         });
 
         // Modal-related for import
@@ -114,6 +108,12 @@ class SterreLink {
             if (e.target.closest('.modal')) {
                 return;
             }
+            
+            // 포커스 모드일 때는 줌 비활성화
+            if (this.focusedPlanetId) {
+                return;
+            }
+            
             e.preventDefault();
 
             const oldZoomLevel = this.zoomLevel;
@@ -153,13 +153,14 @@ class SterreLink {
             if (e.target.closest('.modal, a, button, #star, .context-menu')) {
                 return;
             }
-            e.preventDefault();
             
-            // If starting a drag, break the focus
+            // 포커스 모드일 때는 클릭으로 포커스 해제
             if (this.focusedPlanetId) {
-                this.focusedPlanetId = null;
+                this.unfocusPlanet();
+                return;
             }
-
+            
+            e.preventDefault();
             this.isDragging = true;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
@@ -168,6 +169,10 @@ class SterreLink {
 
         document.body.addEventListener('mousemove', (e) => {
             if (!this.isDragging) return;
+            
+            // 포커스 모드일 때는 패닝 비활성화
+            if (this.focusedPlanetId) return;
+            
             e.preventDefault();
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
@@ -205,11 +210,6 @@ class SterreLink {
 
         document.getElementById('context-menu-delete').addEventListener('click', () => {
             this.deleteBookmark(this.contextMenuTargetId);
-            this.hideContextMenu();
-        });
-
-        document.getElementById('context-menu-focus').addEventListener('click', () => {
-            this.focusOnPlanet(this.contextMenuTargetId);
             this.hideContextMenu();
         });
     }
@@ -329,55 +329,66 @@ class SterreLink {
     }
 
     renderBookmarkGrid(filteredBookmarks = null) {
-        const bookmarksToRender = filteredBookmarks || this.bookmarks;
         const grid = document.getElementById('bookmark-grid');
         grid.innerHTML = '';
+        const bookmarksToRender = filteredBookmarks || this.bookmarks;
 
-        if (bookmarksToRender.length === 0) {
-            grid.innerHTML = '<p>No bookmarks found.</p>';
-            return;
-        }
+        bookmarksToRender.forEach((bookmark, index) => {
+            // It's possible for a "bookmark" to be a folder, which has no URL.
+            if (!bookmark.url) return;
 
-        bookmarksToRender.forEach(bookmark => {
-            const card = document.createElement('div');
-            card.className = 'bookmark-card';
-            card.dataset.id = bookmark.id;
-
-            const favicon = document.createElement('img');
-            favicon.src = this.getFavicon(bookmark.url);
-            favicon.alt = 'Favicon';
-            favicon.className = 'favicon';
-
-            const title = document.createElement('h3');
-            title.textContent = bookmark.title;
-
-            const url = document.createElement('p');
-            url.textContent = bookmark.url;
-
-            const actions = document.createElement('div');
-            actions.className = 'actions';
-
-            const editBtn = document.createElement('button');
-            editBtn.textContent = 'Edit';
-            editBtn.onclick = () => this.showEditBookmarkModal(bookmark.id);
-
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Delete';
-            deleteBtn.onclick = () => this.deleteBookmark(bookmark.id);
+            const orbitalProperties = this.calculateOrbitalProperties(bookmark.url);
+            const orbitRadius = this.calculateOrbitRadius(index);
             
-            const focusBtn = document.createElement('button');
-            focusBtn.textContent = 'Focus';
-            focusBtn.className = 'focus-btn';
-            focusBtn.dataset.id = bookmark.id;
+            const card = document.createElement('div'); // Use div instead of <a>
+            card.className = 'bookmark-card';
+            card.dataset.id = bookmark.id; // Store bookmark ID
+            
+            card.addEventListener('click', (e) => {
+                // Only open URL if not clicking on focus button
+                if (!e.target.closest('.focus-button')) {
+                    window.open(bookmark.url, '_blank');
+                }
+            });
 
-            actions.appendChild(editBtn);
-            actions.appendChild(deleteBtn);
-            actions.appendChild(focusBtn);
+            // Only add context menu listener if the bookmark has an ID
+            if (bookmark.id) {
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e.pageX, e.pageY, bookmark.id);
+                });
+            }
 
-            card.appendChild(favicon);
-            card.appendChild(title);
-            card.appendChild(url);
-            card.appendChild(actions);
+            card.innerHTML = `
+                <img src="${this.getFavicon(bookmark.url)}" class="bookmark-card-favicon" alt="">
+                <div class="bookmark-card-title">${bookmark.title}</div>
+                <div class="bookmark-card-url">${bookmark.url}</div>
+                <div class="bookmark-card-info">
+                    <span>자전 속도: ${orbitalProperties.rotationSpeed.toFixed(2)}</span> | 
+                    <span>항성 거리: ${orbitalProperties.distanceFromStar.toFixed(0)}</span>
+                </div>
+                <button class="focus-button" data-bookmark-id="${bookmark.id}" data-orbit-radius="${orbitRadius}">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="M21 21l-4.35-4.35"></path>
+                    </svg>
+                    포커스
+                </button>
+            `;
+
+            // Add focus button event listener
+            const focusButton = card.querySelector('.focus-button');
+            focusButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const bookmarkId = e.target.closest('.focus-button').dataset.bookmarkId;
+                const orbitRadius = parseFloat(e.target.closest('.focus-button').dataset.orbitRadius);
+                
+                // Close the modal and focus on the planet
+                this.hideBookmarkListModal();
+                setTimeout(() => {
+                    this.focusPlanet(bookmarkId, orbitRadius);
+                }, 100);
+            });
 
             grid.appendChild(card);
         });
@@ -471,16 +482,16 @@ class SterreLink {
     }
 
     showContextMenu(x, y, bookmarkId) {
-        this.contextMenuTargetId = bookmarkId;
-        const menu = document.getElementById('context-menu');
+        const menu = document.getElementById('bookmark-context-menu');
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
         menu.style.display = 'block';
         this.contextMenuVisible = true;
+        this.contextMenuTargetId = bookmarkId;
     }
 
     hideContextMenu() {
-        const menu = document.getElementById('context-menu');
+        const menu = document.getElementById('bookmark-context-menu');
         menu.style.display = 'none';
         this.contextMenuVisible = false;
         this.contextMenuTargetId = null;
@@ -603,12 +614,20 @@ class SterreLink {
             planet.href = bookmark.url;
             planet.target = '_blank';
             planet.style.backgroundImage = `url(${this.getFavicon(bookmark.url)})`;
+            planet.dataset.bookmarkId = bookmark.id; // Store bookmark ID for focus functionality
             
             // Tooltip for the planet name
             const tooltip = document.createElement('div');
             tooltip.className = 'planet-tooltip';
             tooltip.textContent = bookmark.title;
             planet.appendChild(tooltip);
+
+            // Add right-click event for focus
+            planet.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.focusPlanet(bookmark.id, orbitRadius);
+            });
 
             // Add planet to its rotation container
             rotationContainer.appendChild(planet);
@@ -645,45 +664,23 @@ class SterreLink {
         }
 
         const animate = () => {
-            if (this.focusedPlanetId) {
-                const focusedPlanet = this.planetElements.find(p => p.dataset.id === this.focusedPlanetId);
-                if (focusedPlanet) {
-                    const planetRect = focusedPlanet.getBoundingClientRect();
-                    // Calculate the center of the planet in screen coordinates
-                    const planetScreenX = planetRect.left + planetRect.width / 2;
-                    const planetScreenY = planetRect.top + planetRect.height / 2;
-
-                    const screenCenterX = window.innerWidth / 2;
-                    const screenCenterY = window.innerHeight / 2;
-                    
-                    // The difference is how much we need to move the view
-                    const dx = screenCenterX - planetScreenX;
-                    const dy = screenCenterY - planetScreenY;
-
-                    this.viewX += dx;
-                    this.viewY += dy;
-                }
-            }
-
             const now = Date.now();
-            this.planetElements.forEach(planet => {
-                const id = planet.dataset.id;
-                const bookmark = this.bookmarks.find(b => b.id === id);
-                if (!bookmark) return;
 
-                const { initialAngle, rotationSpeed } = this.calculateOrbitalProperties(bookmark.url);
-                const orbitRadius = this.calculateOrbitRadius(this.bookmarks.indexOf(bookmark));
-                const speed = rotationSpeed * 0.001; // Convert rotation speed to radians per millisecond
-                const angle = initialAngle + speed * (now / 1000);
-                const x = Math.cos(angle) * orbitRadius;
-                const y = Math.sin(angle) * orbitRadius;
-                planet.style.transform = `translate(${x}px, ${y}px)`;
+            this.planetElements.forEach(rotationContainer => {
+                const durationMs = parseFloat(rotationContainer.dataset.duration) * 1000;
+                const initialAngle = parseFloat(rotationContainer.dataset.initialAngle);
+                const direction = parseInt(rotationContainer.dataset.direction, 10);
+
+                // Calculate the progress of the orbit based on current time
+                const progress = (now % durationMs) / durationMs;
+                const currentAngle = (initialAngle + progress * 360 * direction) % 360;
+                
+                rotationContainer.style.transform = `translate(-50%, -50%) rotate(${currentAngle}deg)`;
             });
-
-            this.updateView();
 
             this.animationId = requestAnimationFrame(animate);
         };
+
         this.animationId = requestAnimationFrame(animate);
     }
 
@@ -700,7 +697,7 @@ class SterreLink {
     }
 
     showImportBookmarksModal() {
-        document.getElementById('import-bookmarks-modal').style.display = 'flex';
+        document.getElementById('import-bookmarks-modal').style.display = 'block';
     }
 
     hideImportBookmarksModal() {
@@ -776,29 +773,63 @@ class SterreLink {
         }
     }
 
-    focusOnPlanet(bookmarkId) {
-        if (!bookmarkId) return;
+    focusPlanet(bookmarkId, orbitRadius) {
+        // 이미 포커스된 상태면 무시
+        if (this.focusedPlanetId === bookmarkId) {
+            return;
+        }
 
-        const planetData = this.bookmarks.find(b => b.id === bookmarkId);
-        if (!planetData) return;
-        
-        const planetIndex = this.bookmarks.findIndex(b => b.id === bookmarkId);
-        if (planetIndex === -1) return;
-        const orbitRadius = this.calculateOrbitRadius(planetIndex);
+        // 현재 뷰 상태 저장
+        this.originalViewX = this.viewX;
+        this.originalViewY = this.viewY;
+        this.originalZoomLevel = this.zoomLevel;
 
-
+        // 포커스된 행성 ID 설정
         this.focusedPlanetId = bookmarkId;
 
-        // Calculate the optimal zoom level.
-        // Let's aim to make the orbit radius take up about 30% of the smaller viewport dimension.
-        const minViewportDim = Math.min(window.innerWidth, window.innerHeight);
-        const targetZoom = (minViewportDim * 0.3) / orbitRadius;
-        
-        this.zoomLevel = Math.max(0.05, Math.min(targetZoom, 5)); // Clamp zoom level
+        // 화면 중앙으로 이동
+        this.viewX = window.innerWidth / 2;
+        this.viewY = window.innerHeight / 2;
 
-        // The centering will be handled by the animation loop.
-        // We just need to trigger an update.
+        // 적절한 확대 배율 계산 (궤도 반지름에 따라 조정)
+        const targetZoom = Math.min(Math.max(300 / orbitRadius, 0.8), 3);
+        this.zoomLevel = targetZoom;
+
+        // 부드러운 애니메이션을 위해 transition 적용
+        const solarSystem = document.getElementById('solar-system');
+        solarSystem.style.transition = 'transform 0.8s ease-out';
+        
         this.updateView();
+
+        // 애니메이션 완료 후 transition 제거
+        setTimeout(() => {
+            solarSystem.style.transition = 'none';
+        }, 800);
+    }
+
+    unfocusPlanet() {
+        if (!this.focusedPlanetId) {
+            return;
+        }
+
+        // 원래 뷰 상태로 복원
+        this.viewX = this.originalViewX;
+        this.viewY = this.originalViewY;
+        this.zoomLevel = this.originalZoomLevel;
+
+        // 포커스 해제
+        this.focusedPlanetId = null;
+
+        // 부드러운 애니메이션을 위해 transition 적용
+        const solarSystem = document.getElementById('solar-system');
+        solarSystem.style.transition = 'transform 0.8s ease-out';
+        
+        this.updateView();
+
+        // 애니메이션 완료 후 transition 제거
+        setTimeout(() => {
+            solarSystem.style.transition = 'none';
+        }, 800);
     }
 }
 

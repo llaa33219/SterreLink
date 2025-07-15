@@ -373,37 +373,31 @@ body.zoomed-in .planet-tooltip {
     color: #888;
 }
 
-.bookmark-card h3 {
-    margin: 10px 0;
-    font-size: 1em;
-}
-
-.bookmark-card p {
-    margin: 0;
-    font-size: 0.8em;
-    color: #aaa;
-    word-break: break-all;
-}
-
-.bookmark-card .actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
+.focus-button {
     margin-top: 10px;
-}
-
-.bookmark-card .actions button {
-    background-color: #444;
-    color: white;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 3px;
+    padding: 8px 12px;
+    background-color: rgba(255, 215, 0, 0.2);
+    border: 1px solid #FFD700;
+    border-radius: 5px;
+    color: #FFD700;
+    font-size: 12px;
     cursor: pointer;
-    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+    width: 100%;
+    justify-content: center;
 }
 
-.bookmark-card .actions button:hover {
-    background-color: #555;
+.focus-button:hover {
+    background-color: #FFD700;
+    color: #000;
+}
+
+.focus-button svg {
+    width: 14px;
+    height: 14px;
 }
 
 .search-container {
@@ -427,8 +421,8 @@ body.zoomed-in .planet-tooltip {
 
 /* Context Menu */
 .context-menu {
-    position: absolute;
     display: none;
+    position: fixed;
     z-index: 3000;
     background-color: #2c2c2c;
     border-radius: 5px;
