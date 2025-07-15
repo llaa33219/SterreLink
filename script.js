@@ -115,7 +115,7 @@ class SterreLink {
         
         document.body.addEventListener('mousedown', (e) => {
             // Allow clicking on links and buttons
-            if (e.target.closest('a, button')) {
+            if (e.target.closest('a, button, #star')) {
                 return;
             }
             e.preventDefault();
