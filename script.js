@@ -324,10 +324,13 @@ class SterreLink {
                 window.open(bookmark.url, '_blank');
             });
 
-            card.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                this.showContextMenu(e.pageX, e.pageY, bookmark.id);
-            });
+            // Only add context menu listener if the bookmark has an ID
+            if (bookmark.id) {
+                card.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e.pageX, e.pageY, bookmark.id);
+                });
+            }
 
             card.innerHTML = `
                 <img src="${this.getFavicon(bookmark.url)}" class="bookmark-card-favicon" alt="">
