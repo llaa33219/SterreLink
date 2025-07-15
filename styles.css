@@ -176,15 +176,6 @@ body {
     opacity: 1;
 }
 
-@keyframes planet-rotation {
-    from {
-        transform: translate(-50%, -50%) rotate(0deg);
-    }
-    to {
-        transform: translate(-50%, -50%) rotate(360deg);
-    }
-}
-
 #user-profile-widget {
     position: fixed;
     top: 20px;

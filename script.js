@@ -78,7 +78,7 @@ class SterreLink {
                 this.zoomLevel = Math.min(this.zoomLevel * 1.1, 3);
             }
             this.updateZoom();
-        });
+        }, { passive: false }); // Explicitly set passive to false to prevent console warnings
     }
 
     showLoading() {
@@ -235,10 +235,10 @@ class SterreLink {
     calculateOrbitalProperties(url) {
         const hash = this.stringToHash(url);
         
-        // Duration between 20,000 and 100,000 seconds for a very slow, epic orbit
-        const MIN_DURATION = 20000;
-        const MAX_DURATION = 100000;
-        const duration = MIN_DURATION + (hash % (MAX_DURATION - MIN_DURATION));
+        // Duration between 300s (5min) and 1800s (30min) for a visible but slow orbit.
+        const MIN_DURATION_S = 300;
+        const MAX_DURATION_S = 1800;
+        const duration = MIN_DURATION_S + (hash % (MAX_DURATION_S - MIN_DURATION_S));
 
         // Initial angle between 0 and 360 degrees
         const initialAngle = hash % 360;
@@ -249,9 +249,10 @@ class SterreLink {
 
     getFavicon(url) {
         try {
-            const domain = new URL(url).hostname;
-            return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+            // Use a more modern and reliable favicon service
+            return `https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${encodeURIComponent(url)}&size=32`;
         } catch (error) {
+            // Fallback for invalid URLs
             return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjRkZGIi8+Cjwvc3ZnPgo=';
         }
     }
@@ -281,11 +282,13 @@ class SterreLink {
             rotationContainer.style.width = `${orbitRadius * 2}px`;
             rotationContainer.style.height = `${orbitRadius * 2}px`;
             
-            // Set animation properties
-            const animationDirection = index % 2 === 0 ? 'normal' : 'reverse';
-            rotationContainer.style.animation = `planet-rotation ${duration}s linear infinite ${animationDirection}`;
-            
-            // Set initial position
+            // We will now control rotation with JavaScript, not CSS animation.
+            // Store properties needed for animation on the element itself.
+            rotationContainer.dataset.duration = duration;
+            rotationContainer.dataset.initialAngle = initialAngle;
+            rotationContainer.dataset.direction = index % 2 === 0 ? 1 : -1;
+
+            // Set initial position (JS will override this in the first frame)
             rotationContainer.style.transform = `translate(-50%, -50%) rotate(${initialAngle}deg)`;
 
             // 3. Create Planet Element
@@ -310,7 +313,7 @@ class SterreLink {
             this.planetElements.push(rotationContainer);
         });
 
-        // Start animation (now handled by CSS, but we keep the function in case we need it later)
+        // Start the JS animation loop
         this.startAnimation();
     }
 
@@ -327,15 +330,26 @@ class SterreLink {
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
         }
-    }
+        
+        const animate = () => {
+            const now = Date.now();
 
-    startAnimation() {
-        // JS-based animation loop is no longer needed for position updates.
-        // We can keep the rAF loop for other potential real-time updates if necessary.
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-        }
-        // this.animationId = requestAnimationFrame(() => this.startAnimation());
+            this.planetElements.forEach(rotationContainer => {
+                const durationMs = parseFloat(rotationContainer.dataset.duration) * 1000;
+                const initialAngle = parseFloat(rotationContainer.dataset.initialAngle);
+                const direction = parseInt(rotationContainer.dataset.direction, 10);
+
+                // Calculate the progress of the orbit based on current time
+                const progress = (now % durationMs) / durationMs;
+                const currentAngle = (initialAngle + progress * 360 * direction) % 360;
+                
+                rotationContainer.style.transform = `translate(-50%, -50%) rotate(${currentAngle}deg)`;
+            });
+
+            this.animationId = requestAnimationFrame(animate);
+        };
+
+        this.animationId = requestAnimationFrame(animate);
     }
 
     updateZoom() {
