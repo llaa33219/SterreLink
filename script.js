@@ -30,6 +30,30 @@ class SterreLink {
     }
 
     setupEventListeners() {
+        // Profile dropdown handling
+        const profileWidget = document.getElementById('user-profile-widget');
+        const profilePic = document.getElementById('user-profile-pic');
+        const dropdown = document.getElementById('user-dropdown');
+        let dropdownTimeout;
+
+        // Show dropdown on profile pic hover
+        profilePic.addEventListener('mouseenter', () => {
+            clearTimeout(dropdownTimeout);
+            dropdown.classList.add('show');
+        });
+
+        // Keep dropdown open when hovering over it
+        profileWidget.addEventListener('mouseenter', () => {
+            clearTimeout(dropdownTimeout);
+        });
+
+        // Hide dropdown when mouse leaves the widget area
+        profileWidget.addEventListener('mouseleave', () => {
+            dropdownTimeout = setTimeout(() => {
+                dropdown.classList.remove('show');
+            }, 100); // Small delay to allow smooth transition
+        });
+
         // 항성 클릭 (로그인 또는 북마크 추가)
         document.getElementById('star').addEventListener('click', () => {
             if (!this.isLoggedIn) {
@@ -536,18 +560,24 @@ class SterreLink {
         // 해시를 이용한 변동성 추가
         const variation = (hash % 20) - 10; // -10 ~ +10
         
-        // 최종 크기 계산 (20 ~ 50 픽셀 범위)
+        // 최종 크기 계산 (무제한)
         let size = 20 + (lengthFactor * 0.5) + variation;
-        size = Math.max(20, Math.min(50, size)); // 크기 제한
+        size = Math.max(10, size); // 최소 크기만 설정
         
         // 크기 카테고리 결정
         let sizeCategory;
-        if (size < 28) {
+        if (size < 25) {
+            sizeCategory = '극소형';
+        } else if (size < 35) {
             sizeCategory = '소형';
-        } else if (size < 38) {
+        } else if (size < 50) {
             sizeCategory = '중형';
-        } else {
+        } else if (size < 70) {
             sizeCategory = '대형';
+        } else if (size < 100) {
+            sizeCategory = '거대형';
+        } else {
+            sizeCategory = '초거대형';
         }
         
         return { size: Math.round(size), sizeCategory };

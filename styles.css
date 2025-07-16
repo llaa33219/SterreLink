@@ -185,7 +185,6 @@ body.zoomed-in .planet-tooltip {
     top: 20px;
     left: 20px;
     z-index: 1001;
-    cursor: pointer;
 }
 
 #user-profile-pic {
@@ -193,17 +192,7 @@ body.zoomed-in .planet-tooltip {
     height: 40px;
     border-radius: 50%;
     border: 2px solid #fff;
-}
-
-/* 드롭다운을 위한 가상 요소로 호버 영역 확장 */
-#user-profile-widget::before {
-    content: '';
-    position: absolute;
-    top: -10px;
-    left: -10px;
-    right: -10px;
-    bottom: -50px; /* 드롭다운까지 커버하도록 충분히 확장 */
-    z-index: -1;
+    cursor: pointer;
 }
 
 .dropdown-content {
@@ -216,6 +205,10 @@ body.zoomed-in .planet-tooltip {
     border-radius: 5px;
     overflow: hidden;
     margin-top: 5px;
+}
+
+.dropdown-content.show {
+    display: block;
 }
 
 .dropdown-content a {
@@ -235,10 +228,6 @@ body.zoomed-in .planet-tooltip {
     height: 1px;
     background-color: #555;
     margin: 5px 0;
-}
-
-#user-profile-widget:hover .dropdown-content {
-    display: block;
 }
 
 #list-view-button-container {
