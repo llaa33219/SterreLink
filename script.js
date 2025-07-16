@@ -89,8 +89,8 @@ class SterreLink {
             this.filterBookmarks(e.target.value);
         });
 
-        // Delete all bookmarks button
-        document.getElementById('delete-all-btn').addEventListener('click', () => {
+        // Delete all bookmarks from dropdown
+        document.getElementById('delete-all-bookmarks-dropdown').addEventListener('click', () => {
             this.deleteAllBookmarks();
         });
 
@@ -320,6 +320,7 @@ class SterreLink {
             if (!bookmark.url) return;
 
             const orbitalProperties = this.calculateOrbitalProperties(bookmark.url);
+            const { size, sizeCategory } = this.calculatePlanetSize(bookmark.title, bookmark.url);
             
             const card = document.createElement('div'); // Use div instead of <a>
             card.className = 'bookmark-card';
@@ -342,6 +343,7 @@ class SterreLink {
                 <div class="bookmark-card-title">${bookmark.title}</div>
                 <div class="bookmark-card-url">${bookmark.url}</div>
                 <div class="bookmark-card-info">
+                    <span>크기: ${sizeCategory} (${size}px)</span> | 
                     <span>자전 속도: ${orbitalProperties.rotationSpeed.toFixed(2)}</span> | 
                     <span>항성 거리: ${orbitalProperties.distanceFromStar.toFixed(0)}</span>
                 </div>
@@ -515,6 +517,42 @@ class SterreLink {
         return { rotationSpeed, distanceFromStar, duration, initialAngle };
     }
 
+    /**
+     * Calculates planet size based on bookmark title and URL length
+     */
+    calculatePlanetSize(title, url) {
+        if (!title || !url) {
+            return { size: 32, sizeCategory: '중형' };
+        }
+        
+        // 제목과 URL 길이의 조합으로 크기 결정
+        const titleLength = title.length;
+        const urlLength = url.length;
+        const hash = this.stringToHash(title + url);
+        
+        // 기본 크기 계산 (제목 길이 * 0.8 + URL 길이 * 0.2)
+        const lengthFactor = (titleLength * 0.8 + urlLength * 0.2);
+        
+        // 해시를 이용한 변동성 추가
+        const variation = (hash % 20) - 10; // -10 ~ +10
+        
+        // 최종 크기 계산 (20 ~ 50 픽셀 범위)
+        let size = 20 + (lengthFactor * 0.5) + variation;
+        size = Math.max(20, Math.min(50, size)); // 크기 제한
+        
+        // 크기 카테고리 결정
+        let sizeCategory;
+        if (size < 28) {
+            sizeCategory = '소형';
+        } else if (size < 38) {
+            sizeCategory = '중형';
+        } else {
+            sizeCategory = '대형';
+        }
+        
+        return { size: Math.round(size), sizeCategory };
+    }
+
     getFavicon(url) {
         if (!url) {
             return ''; // Should not happen due to the check in renderBookmarkGrid
@@ -570,6 +608,11 @@ class SterreLink {
             planet.href = bookmark.url;
             planet.target = '_blank';
             planet.style.backgroundImage = `url(${this.getFavicon(bookmark.url)})`;
+            
+            // Apply planet size
+            const { size } = this.calculatePlanetSize(bookmark.title, bookmark.url);
+            planet.style.width = `${size}px`;
+            planet.style.height = `${size}px`;
             
             // Tooltip for the planet name
             const tooltip = document.createElement('div');
