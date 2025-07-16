@@ -374,41 +374,43 @@ body.zoomed-in .planet-tooltip {
 }
 
 .search-container {
-    display: flex;
     margin-bottom: 20px;
+    display: flex;
     gap: 10px;
 }
 
 #bookmark-search-input {
-    width: 100%;
+    flex: 1;
     padding: 10px;
-    background-color: #222;
+    background-color: #2a2a2e;
     border: 1px solid #555;
     border-radius: 5px;
     color: #fff;
     font-size: 16px;
-    flex-grow: 1;
 }
 
 #bookmark-search-input:focus {
     outline: none;
     border-color: #777;
-    box-shadow: 0 0 5px rgba(119, 119, 119, 0.5);
 }
 
-.danger-btn {
-    background-color: #b71c1c;
+.delete-all-button {
+    padding: 10px 20px;
+    background-color: #dc3545;
     color: white;
     border: none;
-    padding: 10px 15px;
     border-radius: 5px;
     cursor: pointer;
     font-weight: bold;
-    transition: background-color 0.3s;
+    transition: background-color 0.3s ease;
 }
 
-.danger-btn:hover {
-    background-color: #e53935;
+.delete-all-button:hover {
+    background-color: #c82333;
+}
+
+.delete-all-button:active {
+    background-color: #bd2130;
 }
 
 /* Context Menu */

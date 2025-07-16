@@ -490,52 +490,31 @@ async function handleUpdateBookmark(request, env, user, bookmarkId) {
 
 async function handleDeleteBookmark(request, env, user, bookmarkId) {
     console.log(`Deleting bookmark ${bookmarkId} for user ${user.email}`);
-    try {
-        const userKey = `user:${user.email}`;
-        let userData = await env.KV_NAMESPACE.get(userKey, { type: 'json' });
+    
+    const userBookmarksKey = `bookmarks:${user.email}`;
+    let bookmarks = await env.KV_NAMESPACE.get(userBookmarksKey, { type: 'json' }) || [];
 
-        if (userData && userData.bookmarks) {
-            const initialCount = userData.bookmarks.length;
-            userData.bookmarks = userData.bookmarks.filter(b => b.id !== bookmarkId);
-            const finalCount = userData.bookmarks.length;
+    const initialLength = bookmarks.length;
+    bookmarks = bookmarks.filter(b => b.id !== bookmarkId);
 
-            if (initialCount > finalCount) {
-                await env.KV_NAMESPACE.put(userKey, JSON.stringify(userData));
-                console.log(`Bookmark ${bookmarkId} deleted successfully.`);
-                return new Response(JSON.stringify({ message: 'Bookmark deleted' }), { status: 200 });
-            } else {
-                console.log(`Bookmark ${bookmarkId} not found for user ${user.email}`);
-                return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404 });
-            }
-        } else {
-            return new Response(JSON.stringify({ error: 'User data or bookmarks not found' }), { status: 404 });
-        }
-    } catch (error) {
-        console.error('Error deleting bookmark:', error);
-        return new Response(JSON.stringify({ error: 'Failed to delete bookmark' }), { status: 500 });
+    if (bookmarks.length === initialLength) {
+        return new Response(JSON.stringify({ error: 'Bookmark not found' }), { status: 404 });
     }
+
+    await env.KV_NAMESPACE.put(userBookmarksKey, JSON.stringify(bookmarks));
+    
+    return new Response(JSON.stringify({ message: 'Bookmark deleted' }), { status: 200 });
 }
 
 async function handleDeleteAllBookmarks(request, env, user) {
     console.log(`Deleting all bookmarks for user ${user.email}`);
-    try {
-        const userKey = `user:${user.email}`;
-        let userData = await env.KV_NAMESPACE.get(userKey, { type: 'json' });
-
-        if (userData) {
-            userData.bookmarks = [];
-            await env.KV_NAMESPACE.put(userKey, JSON.stringify(userData));
-            console.log(`All bookmarks for ${user.email} have been deleted.`);
-            return new Response(JSON.stringify({ message: 'All bookmarks deleted' }), { status: 200 });
-        } else {
-            // 사용자는 있지만 북마크 데이터가 없는 경우도 성공으로 처리
-            console.log(`No user data found for ${user.email}, nothing to delete.`);
-            return new Response(JSON.stringify({ message: 'No bookmarks to delete' }), { status: 200 });
-        }
-    } catch (error) {
-        console.error('Error deleting all bookmarks:', error);
-        return new Response(JSON.stringify({ error: 'Failed to delete all bookmarks' }), { status: 500 });
-    }
+    
+    const userBookmarksKey = `bookmarks:${user.email}`;
+    
+    // 모든 북마크를 빈 배열로 설정
+    await env.KV_NAMESPACE.put(userBookmarksKey, JSON.stringify([]));
+    
+    return new Response(JSON.stringify({ message: 'All bookmarks deleted', deleted: true }), { status: 200 });
 }
 
 
@@ -545,7 +524,6 @@ export default {
         try {
             const url = new URL(request.url);
             const pathname = url.pathname;
-            const method = request.method;
             console.log(`Request received: ${request.method} ${pathname}`);
 
             // --- API Routes ---
@@ -553,7 +531,7 @@ export default {
                 let response;
 
                 // Handle OPTIONS for CORS preflight
-                if (method === 'OPTIONS') {
+                if (request.method === 'OPTIONS') {
                     response = new Response(null, { status: 204 });
                     return setCORSHeaders(response);
                 }
@@ -577,51 +555,35 @@ export default {
                 // --- Authenticated Routes ---
                 const user = await getUser(request, env);
                 if (!user) {
-                    // Unauthenticated API routes
-                    if (pathname === '/api/auth/google' && method === 'GET') {
-                        response = await handleGoogleAuth(request, env);
-                    } else if (pathname === '/api/auth/callback' && method === 'GET') {
-                        response = await handleGoogleCallback(request, env);
-                    } else if (pathname === '/api/auth/status' && method === 'GET') {
-                        response = await handleAuthStatus(request, env);
-                    } else {
-                        response = new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
-                    }
+                    response = new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+                    return setCORSHeaders(response);
+                }
+
+                const bookmarkMatch = pathname.match(/^\/api\/bookmarks\/([a-zA-Z0-9-]+)$/);
+
+                if (pathname === '/api/bookmarks' && request.method === 'GET') {
+                    response = await handleGetBookmarks(request, env, user);
+                } else if (pathname === '/api/bookmarks' && request.method === 'POST') {
+                    response = await handleAddBookmark(request, env, user);
+                } else if (pathname === '/api/bookmarks/bulk' && request.method === 'POST') {
+                    response = await handleBulkAddBookmarks(request, env, user);
+                } else if (bookmarkMatch && request.method === 'PUT') {
+                    const bookmarkId = bookmarkMatch[1];
+                    response = await handleUpdateBookmark(request, env, user, bookmarkId);
+                } else if (pathname === '/api/bookmarks' && request.method === 'DELETE') {
+                    response = await handleDeleteAllBookmarks(request, env, user);
+                } else if (bookmarkMatch && request.method === 'DELETE') {
+                    const bookmarkId = bookmarkMatch[1];
+                    response = await handleDeleteBookmark(request, env, user, bookmarkId);
                 } else {
-                    // Authenticated API routes
-                    if (pathname === '/api/auth/logout' && method === 'POST') {
-                        response = await handleLogout(request, env);
-                    } else if (pathname === '/api/bookmarks' && method === 'GET') {
-                        response = await handleGetBookmarks(request, env, user);
-                    } else if (pathname === '/api/bookmarks' && method === 'POST') {
-                        response = await handleAddBookmark(request, env, user);
-                    } else if (pathname === '/api/bookmarks/bulk' && method === 'POST') {
-                        response = await handleBulkAddBookmarks(request, env, user);
-                    } else if (pathname.startsWith('/api/bookmarks/') && method === 'PUT') {
-                        const bookmarkId = pathname.split('/')[3];
-                        response = await handleUpdateBookmark(request, env, user, bookmarkId);
-                    } else if (pathname.startsWith('/api/bookmarks/') && method === 'DELETE') {
-                        const bookmarkId = pathname.split('/')[3];
-                        if (bookmarkId === 'all') {
-                            response = await handleDeleteAllBookmarks(request, env, user);
-                        } else {
-                            response = await handleDeleteBookmark(request, env, user, bookmarkId);
-                        }
-                    } else {
-                        response = new Response(JSON.stringify({ error: 'API route not found' }), { status: 404 });
-                    }
+                    response = new Response(JSON.stringify({ error: 'API route not found' }), { status: 404 });
                 }
                 
                 return setCORSHeaders(response);
             }
             
-            // Fallback for asset serving
-            try {
-                return env.ASSETS.fetch(request);
-            } catch (e) {
-                console.error('Error fetching asset:', e);
-                return new Response('Asset not found', { status: 404 });
-            }
+            // Fallback to static asset handler if not an API route
+            return env.ASSETS.fetch(request);
 
         } catch (e) {
             console.error('Unhandled error in fetch handler:', e);

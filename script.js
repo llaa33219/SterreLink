@@ -89,6 +89,7 @@ class SterreLink {
             this.filterBookmarks(e.target.value);
         });
 
+        // Delete all bookmarks button
         document.getElementById('delete-all-btn').addEventListener('click', () => {
             this.deleteAllBookmarks();
         });
@@ -418,44 +419,21 @@ class SterreLink {
     }
 
     async deleteBookmark(id) {
-        if (confirm('정말로 이 북마크를 삭제하시겠습니까?')) {
-            try {
-                const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
-                if (response.ok) {
-                    this.bookmarks = this.bookmarks.filter(b => b.id !== id);
-                    this.renderPlanets();
-                    this.renderBookmarkGrid();
-                } else {
-                    alert('북마크 삭제에 실패했습니다.');
-                }
-            } catch (error) {
-                console.error('Error deleting bookmark:', error);
-                alert('북마크 삭제 중 오류가 발생했습니다.');
-            }
+        if (!confirm('정말로 이 북마크를 삭제하시겠습니까?')) {
+            return;
         }
-    }
 
-    async deleteAllBookmarks() {
-        if (confirm('정말로 모든 북마크를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-            if (confirm('두 번째 확인입니다. 정말로 모든 데이터를 삭제하시겠습니까?')) {
-                if (confirm('마지막 확인입니다. 모든 북마크가 영구적으로 삭제됩니다. 계속하시겠습니까?')) {
-                    try {
-                        const response = await fetch('/api/bookmarks/all', { method: 'DELETE' });
-                        if (response.ok) {
-                            this.bookmarks = [];
-                            this.renderPlanets();
-                            this.renderBookmarkGrid();
-                            this.hideBookmarkListModal();
-                            alert('모든 북마크가 삭제되었습니다.');
-                        } else {
-                            alert('전체 삭제에 실패했습니다.');
-                        }
-                    } catch (error) {
-                        console.error('Error deleting all bookmarks:', error);
-                        alert('전체 삭제 중 오류가 발생했습니다.');
-                    }
-                }
+        try {
+            const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' });
+            if (response.ok) {
+                this.bookmarks = this.bookmarks.filter(b => b.id !== id);
+                this.renderPlanets();
+                this.renderBookmarkGrid();
+            } else {
+                console.error('Failed to delete bookmark');
             }
+        } catch (error) {
+            console.error('Error deleting bookmark:', error);
         }
     }
 
@@ -740,6 +718,60 @@ class SterreLink {
         } catch (error) {
             console.error('Failed to import bookmarks:', error);
             document.getElementById('import-status').textContent = 'An unexpected error occurred during import.';
+        }
+    }
+
+    async deleteAllBookmarks() {
+        // 1차 경고
+        if (!confirm('정말로 모든 북마크를 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다!')) {
+            return;
+        }
+
+        // 2차 경고
+        if (!confirm('다시 한 번 확인합니다.\n\n정말로 모든 북마크를 삭제하시겠습니까?\n\n🚨 모든 북마크가 영구적으로 삭제됩니다!')) {
+            return;
+        }
+
+        // 3차 경고 (최종 확인)
+        const finalConfirmation = prompt(
+            '⛔ 마지막 경고입니다!\n\n' +
+            '모든 북마크가 영구적으로 삭제됩니다.\n' +
+            '계속하려면 "삭제" 라고 입력하세요:'
+        );
+
+        if (finalConfirmation !== '삭제') {
+            alert('전체 삭제가 취소되었습니다.');
+            return;
+        }
+
+        // 로딩 표시
+        this.showLoading();
+
+        try {
+            const response = await fetch('/api/bookmarks', {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // 모든 북마크를 메모리에서도 삭제
+                this.bookmarks = [];
+                this.clearPlanets();
+                this.renderBookmarkGrid();
+                
+                this.hideLoading();
+                alert('모든 북마크가 성공적으로 삭제되었습니다.');
+                
+                // 북마크 리스트 모달 닫기
+                this.hideBookmarkListModal();
+            } else {
+                this.hideLoading();
+                const errorData = await response.json();
+                alert(`삭제 실패: ${errorData.error || '알 수 없는 오류가 발생했습니다.'}`);
+            }
+        } catch (error) {
+            this.hideLoading();
+            console.error('Failed to delete all bookmarks:', error);
+            alert('북마크 삭제 중 오류가 발생했습니다.');
         }
     }
 }
