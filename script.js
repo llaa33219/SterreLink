@@ -497,8 +497,8 @@ class SterreLink {
      * This ensures each planet has its own distinct orbit.
      */
     calculateOrbitRadius(index) {
-        const BASE_RADIUS = 150; // Radius of the first orbit
-        const RADIUS_STEP = 80;  // Distance between orbits
+        const BASE_RADIUS = 300; // Radius of the first orbit (adjusted for larger star)
+        const RADIUS_STEP = 100;  // Distance between orbits (increased for better spacing)
         return BASE_RADIUS + (index * RADIUS_STEP);
     }
 
@@ -536,7 +536,7 @@ class SterreLink {
 
         // Use the hash to generate deterministic but varied properties
         const rotationSpeed = 1 + (hash % 100) / 50; // Range: 1 to 3
-        const distanceFromStar = 150 + (hash % 200); // Range: 150 to 350
+        const distanceFromStar = 300 + (hash % 400); // Range: 300 to 700 (adjusted for larger star)
         
         return { rotationSpeed, distanceFromStar, duration, initialAngle };
     }

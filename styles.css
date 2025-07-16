@@ -36,8 +36,8 @@ body {
 
 #star {
     position: absolute;
-    width: 100px;
-    height: 100px;
+    width: 500px;
+    height: 500px;
     background: radial-gradient(ellipse at center, #ffd700 0%, #ff8c00 40%, rgba(255,140,0,0) 70%);
     border-radius: 50%;
     top: 50%;
@@ -61,16 +61,16 @@ body {
 }
 
 #star-icon {
-    width: 50px;
-    height: 50px;
+    width: 250px;
+    height: 250px;
     object-fit: contain;
     transition: all 0.3s ease;
 }
 
 #star.logged-in #star-icon {
-    content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>');
-    width: 40px;
-    height: 40px;
+    content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>');
+    width: 200px;
+    height: 200px;
     opacity: 0.8;
 }
 
@@ -551,14 +551,19 @@ body.zoomed-in .planet-tooltip {
 
 /* 반응형 */
 @media (max-width: 768px) {
-    .star {
-        width: 60px;
-        height: 60px;
+    #star {
+        width: 200px;
+        height: 200px;
     }
     
     #star-icon {
-        width: 30px;
-        height: 30px;
+        width: 100px;
+        height: 100px;
+    }
+    
+    #star.logged-in #star-icon {
+        width: 80px;
+        height: 80px;
     }
     
     .planet {
